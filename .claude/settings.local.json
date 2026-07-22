@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test *)",
+      "Bash(npx playwright *)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\Nithin Balaji\\\\OneDrive\\\\Desktop\\\\job scrape\\\\Talent Scout Dashboard\\\\src\" -Recurse -Filter \"*.tsx\")",
+      "Bash(Select-Object -First 20 FullName)",
+      "PowerShell(Get-ChildItem *)",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "PowerShell(Receive-Job *)",
+      "PowerShell(head *)",
+      "PowerShell(npx playwright --version 2>&1)",
+      "PowerShell(npx playwright install chromium --with-deps 2>&1 | Select-Object -Last 5)"
+    ]
+  }
+}

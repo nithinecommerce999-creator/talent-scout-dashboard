@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+@layer base {
+  :root {
+    --background: 220 20% 97%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 162 72% 46%;
+    --primary-foreground: 222 47% 6%;
+
+    --secondary: 220 14% 94%;
+    --secondary-foreground: 222 47% 25%;
+
+    --muted: 220 14% 94%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 162 30% 92%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 162 72% 46%;
+    --success-foreground: 222 47% 6%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 11%;
+
+    --border: 220 13% 90%;
+    --input: 220 13% 87%;
+    --ring: 162 72% 46%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 162 72% 46%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 220 14% 94%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 220 13% 90%;
+    --sidebar-ring: 162 72% 46%;
+
+    --chart-1: 162 72% 46%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 162 72% 46%;
+    --primary-foreground: 222 47% 6%;
+
+    --secondary: 217 33% 14%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 217 33% 14%;
+    --muted-foreground: 218 11% 55%;
+
+    --accent: 217 33% 14%;
+    --accent-foreground: 210 40% 96%;
+
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 162 72% 46%;
+    --success-foreground: 222 47% 6%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 6%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 162 72% 46%;
+
+    --sidebar-background: 222 47% 7%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 162 72% 46%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 217 33% 14%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 162 72% 46%;
+
+    --chart-1: 162 72% 46%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.2);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.3);
+  }
+}
+
+@layer components {
+  .glass {
+    @apply backdrop-blur-xl border;
+    background: hsl(var(--card) / 0.6);
+    border-color: hsl(var(--border) / 0.5);
+  }
+
+  .dark .glass {
+    background: hsl(var(--card) / 0.4);
+    border-color: hsl(var(--border) / 0.3);
+  }
+}
+
+@layer utilities {
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 1.5s ease-in-out infinite;
+    background-size: 200% 100%;
+    background-image: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted-foreground) / 0.08) 50%,
+      hsl(var(--muted)) 100%
+    );
+  }
+}
