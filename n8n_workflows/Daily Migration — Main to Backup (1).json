@@ -1,0 +1,153 @@
+{
+  "name": "Daily Migration — Main to Backup",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 2
+            }
+          ]
+        }
+      },
+      "id": "9e4ce668-7023-4042-86cb-09cef1708323",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1840,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/runs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "run_id"
+            },
+            {
+              "name": "order",
+              "value": "run_date.asc"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "152b9e24-b1be-452d-93f1-046adf8523a1",
+      "name": "Fetch All Runs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2064,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect all run_ids from Supabase response\n// Returns empty array → workflow stops naturally if no runs\nconst items = $input.all();\nlet runs = [];\nif (items.length === 1 && Array.isArray(items[0].json)) {\n  runs = items[0].json;\n} else {\n  runs = items.map(i => i.json).filter(r => r && r.run_id);\n}\nconst run_ids = runs.map(r => r.run_id).filter(Boolean);\nif (run_ids.length === 0) {\n  console.log('[INFO] No runs — stopping');\n  return [];\n}\nconsole.log(`[INFO] Migrating ${run_ids.length} runs`);\nreturn [{ json: { run_ids } }];"
+      },
+      "id": "ce367ac1-6ad6-4174-85e7-5a1dbea7a559",
+      "name": "Build run_ids",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2288,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://thuxlgabdcbkdppffsds.supabase.co/functions/v1/migrate-from-main",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ run_ids: $json.run_ids }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "29727502-9ba2-4f13-b4cc-53a42ab08533",
+      "name": "Run Migration",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2512,
+        176
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch All Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch All Runs": {
+      "main": [
+        [
+          {
+            "node": "Build run_ids",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build run_ids": {
+      "main": [
+        [
+          {
+            "node": "Run Migration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "e98d6714-7815-4b22-94b5-d56aeb9cdfad",
+  "meta": {
+    "instanceId": "1ec8813f30fac48c9544a21b6fbcdbe1ca359e4b4109f04b0dfe5b5cfb3ecc5d"
+  },
+  "id": "8uFgjFyxsDb4iXWo",
+  "tags": []
+}

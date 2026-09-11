@@ -1,0 +1,570 @@
+{
+  "name": "Phase 2A — LinkedIn POC Scraper (Error Handled)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "4970543a-de1a-4ccd-be35-3a6e1969f8e5",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        -432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json;\n\nconst records = (raw.items && Array.isArray(raw.items)) ? raw.items\n              : Array.isArray(raw)                       ? raw\n              : $input.all().map(i => i.json);\n\n// Group all job references by unique recruiter URL\n// One URL can map to multiple job_ids if recruiter posted several jobs\nconst urlMap = {};\nfor (const record of records) {\n  const url = (record.recruiter_profile || '').trim();\n  if (!url) continue;\n\n  if (!urlMap[url]) {\n    urlMap[url] = {\n      recruiter_profile: url,\n      job_refs: []\n    };\n  }\n\n  urlMap[url].job_refs.push({\n    job_id:         record.job_id,\n    company_uid:    record.company_id,\n    run_id:         record.run_id,\n    run_label:      record.run_label,\n    recruiter_name: record.recruiter_name\n  });\n}\n\n// One item per unique URL — each carries full job_refs array\nreturn Object.values(urlMap).map(v => ({ json: v }));"
+      },
+      "id": "599d4f5a-6a6e-4f30-a5fd-41bac1fec930",
+      "name": "Deduplicate Profiles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1552,
+        -432
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "id": "fc24d120-96cd-41f6-ad1c-a68b836a0965",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1776,
+        -432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nreturn [{\n  json: {\n    profileUrls: items.map(i => i.json.recruiter_profile)\n  }\n}];"
+      },
+      "id": "1815a937-7f7e-46c6-8074-fd92878b3ddb",
+      "name": "Build Apify Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        -496
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "Run actor and get dataset",
+        "actorId": {
+          "__rl": true,
+          "value": "LpVuK3Zozwuipa5bp",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Profile Scraper + Email ✅ No Cookies (harvestapi/linkedin-profile-scraper)",
+          "cachedResultUrl": "https://console.apify.com/actors/LpVuK3Zozwuipa5bp/input"
+        },
+        "customBody": "={{ JSON.stringify({ \"profileScraperMode\": \"Profile details + email search ($10 per 1k)\", \"urls\": $json.profileUrls }) }}",
+        "timeout": 300
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        2224,
+        -496
+      ],
+      "id": "2549819a-fa09-41f3-b0c3-9a6ed884994d",
+      "name": "Run an Actor and get dataset",
+      "credentials": {
+        "apifyApi": {
+          "id": "uLQR9nEOZLgZVnIZ",
+          "name": "Apify account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const scraped   = $input.all();\nconst originals = $('Split In Batches').all();\n\n// Build lookup: normalised URL -> job_refs array\nconst urlMap = {};\nfor (const item of originals) {\n  const key = (item.json.recruiter_profile || '')\n    .trim().toLowerCase().replace(/\\/$/,  '');\n  urlMap[key] = item.json.job_refs || [];\n}\n\nconst result = [];\n\nfor (const item of scraped) {\n  const rawUrl  = (item.json.linkedinUrl || '').trim();\n  const key     = rawUrl.toLowerCase().replace(/\\/$/,  '');\n  const jobRefs = urlMap[key] || [{}];\n\n  // ── Location ─────────────────────────────────────────────────────────────\n  // Actual path: location.parsed.city / location.parsed.state\n  const city  = item.json.location?.parsed?.city  ?? null;\n  const state = item.json.location?.parsed?.state ?? null;\n\n  // ── Email ─────────────────────────────────────────────────────────────────\n  // emails[] array — prefer deliverable+valid, fall back to first entry\n  const emailObj = item.json.emails?.find(e => e.deliverable === true && e.status === 'valid')\n                ?? item.json.emails?.[0]\n                ?? null;\n  const email = emailObj?.email ?? null;\n\n  // ── Company website ───────────────────────────────────────────────────────\n  // companyWebsites[] array\n  const scraped_company_website = item.json.companyWebsites?.[0]?.url ?? null;\n\n  // ── Current position fields ───────────────────────────────────────────────\n  const currentPos             = item.json.currentPosition?.[0] ?? null;\n  const scraped_company_name   = currentPos?.companyName ?? null;\n  const job_title              = currentPos?.position    ?? null;\n\n  // ── Identity ──────────────────────────────────────────────────────────────\n  // No fullName field in response — construct from firstName + lastName\n  const first_name   = item.json.firstName ?? null;\n  const last_name    = item.json.lastName  ?? null;\n  const full_name    = (first_name || last_name)\n                       ? `${first_name ?? ''} ${last_name ?? ''}`.trim()\n                       : null;\n\n  // linkedin_id: actor returns objectUrn (numeric urn) at root level\n  const linkedin_id  = item.json.objectUrn ?? item.json.publicIdentifier ?? null;\n\n  // ── Engagement ────────────────────────────────────────────────────────────\n  // connectionsCount / followerCount (not connections / followers)\n  const connections  = item.json.connectionsCount ?? null;\n  const followers    = item.json.followerCount    ?? null;\n\n  // ── Flags ─────────────────────────────────────────────────────────────────\n  // premium / verified (not isPremium / isVerified)\n  const is_premium   = item.json.premium  ?? null;\n  const is_verified  = item.json.verified ?? null;\n\n  // ── Profile picture ───────────────────────────────────────────────────────\n  // profilePicture.url (not profilePicHighQuality / profilePic)\n  const profile_pic  = item.json.profilePicture?.url\n                    ?? item.json.photo?.url\n                    ?? null;\n\n  // Expand: one row per job_ref\n  for (const ref of jobRefs) {\n    result.push({\n      json: {\n        // Per-job association\n        job_id:         ref.job_id         ?? null,\n        company_uid:    ref.company_uid    ?? null,\n        run_id:         ref.run_id         ?? null,\n        run_label:      ref.run_label      ?? null,\n        recruiter_name: ref.recruiter_name ?? null,\n\n        // Core identity\n        profile_linkedin: rawUrl,\n        linkedin_id,\n        first_name,\n        last_name,\n        full_name,\n        job_title,\n        headline:  item.json.headline ?? null,\n\n        // Contact\n        email,\n        mobile_no: null,   // field not present in this actor's response\n\n        // Location\n        city,\n        state,\n\n        // Company info from scrape\n        scraped_company_name,\n        scraped_company_website,\n\n        // Engagement signals\n        connections,\n        followers,\n        is_premium,\n        is_verified,\n        profile_pic\n      }\n    });\n  }\n}\n\nreturn result;"
+      },
+      "id": "6fa7e970-5fe1-409e-9241-82644e848103",
+      "name": "Re-associate with Company",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2448,
+        -592
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "recruiter_poc_scraped",
+          "mode": "list",
+          "cachedResultName": "recruiter_poc_scraped"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [
+            "job_id",
+            "profile_linkedin"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "job_id",
+              "displayName": "job_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company_uid",
+              "displayName": "company_uid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "run_id",
+              "displayName": "run_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "run_label",
+              "displayName": "run_label",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "recruiter_name",
+              "displayName": "recruiter_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "profile_linkedin",
+              "displayName": "profile_linkedin",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "linkedin_id",
+              "displayName": "linkedin_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "first_name",
+              "displayName": "first_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "last_name",
+              "displayName": "last_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "full_name",
+              "displayName": "full_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "job_title",
+              "displayName": "job_title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "headline",
+              "displayName": "headline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "mobile_no",
+              "displayName": "mobile_no",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "city",
+              "displayName": "city",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "scraped_company_name",
+              "displayName": "scraped_company_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "scraped_company_website",
+              "displayName": "scraped_company_website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "connections",
+              "displayName": "connections",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "followers",
+              "displayName": "followers",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "is_premium",
+              "displayName": "is_premium",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "is_verified",
+              "displayName": "is_verified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "profile_pic",
+              "displayName": "profile_pic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "scraped_at",
+              "displayName": "scraped_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2672,
+        -432
+      ],
+      "id": "e5d21013-46ee-4fb0-9c1d-1938a362de4f",
+      "name": "Insert rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "v99IL9rBKD9DHA2k",
+          "name": "Supabase"
+        }
+      },
+      "continueOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/pipeline_errors",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"workflow\": \"Phase 2A \\u2014 LinkedIn POC Scraper\", \"node_name\": \"Run an Actor and get dataset\", \"run_id\": \"{{ $('Split In Batches').first()?.json?.job_refs?.[0]?.run_id ?? 'unknown' }}\", \"severity\": \"WARNING\", \"error_type\": \"APIFY_FAILURE\", \"error_message\": \"{{ $json.error?.message || $json.message || 'Unknown error' }}\", \"item_data\": \"{{ JSON.stringify($json).slice(0,500) }}\"}",
+        "options": {}
+      },
+      "id": "9625317f-5e36-4720-aad0-8887545ca1ee",
+      "name": "Log Error — Actor (2A)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2448,
+        -400
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/pipeline_errors",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"workflow\": \"Phase 2A \\u2014 LinkedIn POC Scraper\", \"node_name\": \"Insert rows in a table\", \"run_id\": \"{{ $('Split In Batches').first()?.json?.job_refs?.[0]?.run_id ?? 'unknown' }}\", \"severity\": \"WARNING\", \"error_type\": \"SUPABASE_WRITE\", \"error_message\": \"{{ $json.error?.message || $json.message || 'Unknown error' }}\", \"item_data\": \"{{ JSON.stringify($json).slice(0,500) }}\"}",
+        "options": {}
+      },
+      "id": "6c56af4f-ed0b-484c-af74-a7c3d7ad1d09",
+      "name": "Log Error — Insert (2A)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2672,
+        -176
+      ],
+      "continueOnFail": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Deduplicate Profiles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deduplicate Profiles": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Build Apify Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Apify Input": {
+      "main": [
+        [
+          {
+            "node": "Run an Actor and get dataset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run an Actor and get dataset": {
+      "main": [
+        [
+          {
+            "node": "Re-associate with Company",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Actor (2A)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-associate with Company": {
+      "main": [
+        [
+          {
+            "node": "Insert rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert rows in a table": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Insert (2A)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "7bd44ee7-6368-4974-bb8d-58b3b9ebb293",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1ec8813f30fac48c9544a21b6fbcdbe1ca359e4b4109f04b0dfe5b5cfb3ecc5d"
+  },
+  "id": "a6DwzHauw_jgJFnoFr9P8",
+  "tags": []
+}

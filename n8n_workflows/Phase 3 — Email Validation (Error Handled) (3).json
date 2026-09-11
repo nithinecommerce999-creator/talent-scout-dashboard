@@ -1,0 +1,408 @@
+{
+  "name": "Phase 3 — Email Validation (Error Handled)",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1232,
+        -512
+      ],
+      "id": "aa67e056-49e8-489a-927d-424847b949a3",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract poc_id + selected_email from each incoming POC record.\n// poc_id is kept as a Number (bigint-compatible) to match poc_leads.poc_id FK.\n// Skips records with no selected_email.\nconst items = $input.all();\nconst result = [];\n\nfor (const item of items) {\n  const data = item.json;\n  const email = (data.selected_email || '').trim();\n  const pocId  = parseInt(data.poc_id, 10);\n  if (email && !isNaN(pocId)) {\n    result.push({\n      json: {\n        poc_id: pocId,\n        email\n      }\n    });\n  }\n}\n\nreturn result;"
+      },
+      "id": "eecfe4b3-d703-4c40-b326-e1c1ebc8a8cc",
+      "name": "Extract POC Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -784,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 20,
+        "options": {}
+      },
+      "id": "7f809075-0e0d-4e53-99fa-80432738cb08",
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -560,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregates all items in the current batch into:\n//   - emails[]       → the array sent to Apify\n//   - timeout        → actor timeout in seconds (as required by the actor's input schema)\n//   - emailToPocId{} → lookup map used after Apify responds\nconst items = $input.all();\nconst emails = [];\nconst emailToPocId = {};\n\nfor (const item of items) {\n  const email = item.json.email;\n  const pocId  = item.json.poc_id;\n  if (email) {\n    emails.push(email);\n    emailToPocId[email] = pocId;\n  }\n}\n\nreturn [{\n  json: {\n    emails,\n    timeout: 10,\n    emailToPocId\n  }\n}];"
+      },
+      "id": "7545844c-c941-43b7-a281-7617966db695",
+      "name": "Build Batch Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -336,
+        -576
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Join each Apify result with its poc_id using the email as the key.\n// poc_id is cast to Number to match the bigint FK on poc_leads.poc_id.\nconst items = $input.all();\nconst emailToPocId = $('Build Batch Input').first().json.emailToPocId;\n\nreturn items.map(item => {\n  const email = item.json.email || '';\n  const rawId = emailToPocId[email];\n  return {\n    json: {\n      poc_id:        rawId != null ? parseInt(rawId, 10) : null,\n      email:         email,\n      email_quality: item.json.email_quality || null,\n      email_result:  item.json.email_result  || null,\n      subresult:     item.json.subresult     || null,\n      validated_at:  new Date().toISOString()\n    }\n  };\n});"
+      },
+      "id": "664987de-9d5d-438c-bdd1-feef16cb26b7",
+      "name": "Map Results to POC ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        -672
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/ranked_poc_email_validations",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { 'poc_id': $json.poc_id, 'email': $json.email, 'email_quality': $json.email_quality, 'email_result': $json.email_result, 'subresult': $json.subresult, 'validated_at': $json.validated_at } }}",
+        "options": {}
+      },
+      "id": "0b7ab3ca-dd70-40af-b907-4ddcfba8408d",
+      "name": "Insert into Postgres",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        -512
+      ],
+      "continueOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "actorId": {
+          "__rl": true,
+          "value": "QM5YJIYftbZQiNpgN",
+          "mode": "list",
+          "cachedResultName": "Easy Bulk Email Validator - Verify Emails From $1/1000 Rows (xmiso_scrapers/easy-bulk-email-validator---verify-emails-from-1-7-1000-rows)",
+          "cachedResultUrl": "https://console.apify.com/actors/QM5YJIYftbZQiNpgN/input"
+        },
+        "customBody": "={{ JSON.stringify({ emails: $json.emails, timeout: 10 }) }}",
+        "timeout": 300
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        -112,
+        -576
+      ],
+      "id": "5fe52f5e-6fd3-4d67-9304-e0897a8f6d3c",
+      "name": "Run an Actor",
+      "credentials": {
+        "apifyApi": {
+          "id": "uLQR9nEOZLgZVnIZ",
+          "name": "Apify account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resource": "Datasets",
+        "datasetId": "={{ $json.defaultDatasetId }}",
+        "offset": {},
+        "options": {}
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        112,
+        -672
+      ],
+      "id": "b8f95a10-4cb6-46d1-821a-6c914666d101",
+      "name": "Get dataset items",
+      "credentials": {
+        "apifyApi": {
+          "id": "uLQR9nEOZLgZVnIZ",
+          "name": "Apify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/pipeline_errors",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"workflow\": \"Phase 3 \\u2014 Email Validation\", \"node_name\": \"Run an Actor\", \"run_id\": \"={{ $('Extract POC Emails').first()?.json?.run_id ?? 'unknown' }}\", \"severity\": \"WARNING\", \"error_type\": \"APIFY_FAILURE\", \"error_message\": \"={{ $json.error?.message || $json.message || 'Unknown error' }}\", \"item_data\": \"={{ JSON.stringify($json).slice(0,500) }}\"}",
+        "options": {}
+      },
+      "id": "d1513181-d57f-4aaa-b6fa-82030e610e81",
+      "name": "Log Error — Actor (P3)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        112,
+        -480
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/pipeline_errors",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"workflow\": \"Phase 3 \\u2014 Email Validation\", \"node_name\": \"Insert into Postgres\", \"run_id\": \"={{ $('Extract POC Emails').first()?.json?.run_id ?? 'unknown' }}\", \"severity\": \"WARNING\", \"error_type\": \"POSTGRES_WRITE\", \"error_message\": \"={{ $json.error?.message || $json.message || 'Unknown error' }}\", \"item_data\": \"={{ JSON.stringify($json).slice(0,500) }}\"}",
+        "options": {}
+      },
+      "id": "55302adc-4c91-4be1-8348-cd57592bd553",
+      "name": "Log Error — Insert (P3)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        896,
+        -432
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "runs",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "run_id",
+              "condition": "eq",
+              "keyValue": "={{ $('When Executed by Another Workflow').first().json.run_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "pipeline_status",
+              "fieldValue": "completed"
+            },
+            {
+              "fieldId": "run_summary",
+              "fieldValue": "Pipeline complete."
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -112
+      ],
+      "id": "ae8ec60d-b4ec-4f86-8ffc-f6ce01cae631",
+      "name": "Update a row",
+      "executeOnce": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "cJL2NuGhqW82mmcs",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Extract POC Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract POC Emails": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Batch Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Results to POC ID": {
+      "main": [
+        [
+          {
+            "node": "Insert into Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert into Postgres": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Insert (P3)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Batch Input": {
+      "main": [
+        [
+          {
+            "node": "Run an Actor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run an Actor": {
+      "main": [
+        [
+          {
+            "node": "Get dataset items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Actor (P3)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get dataset items": {
+      "main": [
+        [
+          {
+            "node": "Map Results to POC ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "16f423ef-ac92-4d0e-ba90-9316f7858ebb",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1ec8813f30fac48c9544a21b6fbcdbe1ca359e4b4109f04b0dfe5b5cfb3ecc5d"
+  },
+  "id": "gE_eOwwlKSVqDiUgI_d7D",
+  "tags": []
+}

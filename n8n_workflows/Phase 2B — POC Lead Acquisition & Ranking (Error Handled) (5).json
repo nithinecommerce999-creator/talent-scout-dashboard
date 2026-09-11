@@ -1,0 +1,1162 @@
+{
+  "name": "Phase 2B — POC Lead Acquisition & Ranking (Error Handled)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        6672,
+        704
+      ],
+      "id": "5c1e7f3e-00a3-44d8-8f14-fb2ce2691646",
+      "name": "▶ Start: Triggered by Phase 1"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://sgnxqspceytihmoynclg.supabase.co/rest/v1/companies?select=company_uid,company_name,company_website,company_industry,company_size,company_linkedin_id&company_uid=in.(' + ($json.company_ids.length > 0 ? $json.company_ids.join(',') : '0') + ')&company_website=not.is.null&company_website=neq.' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "863e3b92-770b-4f08-a49c-727f26e14910",
+      "name": "Read companies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7120,
+        704
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobItems    = $('Extract Company IDs').first().json.job_items || [];\nconst companyRows = $('Read companies').all().map(i => i.json);\nconst run_id      = $('Extract Company IDs').first().json.run_id;\n\nconst companyMap = {};\nfor (const c of companyRows) {\n  companyMap[String(c.company_uid)] = c;\n}\n\nconst grouped = {};\nfor (const job of jobItems) {\n  const cid     = String(job['company ID'] || job.company_id || '').trim();\n  const company = companyMap[cid];\n  if (!company) continue;\n\n  if (!grouped[cid]) {\n    const website = (company.company_website || '').trim();\n    grouped[cid] = {\n      company_uid:         company.company_uid,\n      company_name:        company.company_name     || '',\n      company_website:     website.endsWith('/') ? website.slice(0, -1) : website,\n      company_industry:    company.company_industry || '',\n      company_size:        company.company_size     || '',\n      company_linkedin_id: company.company_linkedin_id || '',\n      run_id:              run_id,\n      job_titles: []\n    };\n  }\n\n  const jt = (job['Job title'] || job.job_title || '').trim();\n  if (jt && !grouped[cid].job_titles.includes(jt)) {\n    grouped[cid].job_titles.push(jt);\n  }\n}\n\nreturn Object.values(grouped)\n  .filter(c => c.company_website && c.company_website.length > 5)\n  .map(c => ({ json: c }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7344,
+        704
+      ],
+      "id": "73009023-ecc7-4312-9f2a-f72a6e6b625a",
+      "name": "Merge & Deduplicate",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        7568,
+        704
+      ],
+      "id": "f9ed576c-ec6c-495c-8cbf-5a18843ff623",
+      "name": "Split in Batches (10)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==========================================================\n// PREPARE APIFY PAYLOAD\n// Sends BOTH company_website AND company_alternate_domain to\n// Apify so leads are found regardless of which domain the\n// company operates under (e.g. jts.com + johnsonthermal.com).\n// ==========================================================\n\nconst FUNCTIONAL_MAP = [\n  { kw: ['finance','financial','accounting','accountant','controller','tax','cfo','treasurer'], fn: 'finance' },\n  { kw: ['hr','human resources','recruiter','talent','people ops','hris','workforce','staffing'], fn: 'human_resources' },\n  { kw: ['operations','operations manager','operations director','vp operations','supply chain','logistics','warehouse','distribution'], fn: 'operations' },\n  { kw: ['engineer','engineering','software','mechanical','electrical','manufacturing','plant manager','production'], fn: 'engineering' },\n  { kw: ['sales','account executive','business development','revenue','growth'], fn: 'sales' },\n  { kw: ['marketing','brand','communications','pr','content','seo'], fn: 'marketing' },\n  { kw: ['legal','attorney','counsel','compliance','paralegal'], fn: 'legal' },\n  { kw: ['construction','site manager','project manager','civil'], fn: 'operations' },\n];\n\nfunction getFunctionalLevels(jobTitles) {\n  const levels = new Set(['human_resources', 'operations']);\n  for (const jt of jobTitles) {\n    const t = (jt || '').toLowerCase();\n    for (const { kw, fn } of FUNCTIONAL_MAP) {\n      if (kw.some(k => t.includes(k))) levels.add(fn);\n    }\n  }\n  return [...levels];\n}\n\nconst companies = items.map(i => i.json);\n\n// Collect all domains — primary + alternate — deduped and non-empty\nconst allDomains = [];\nconst seenDomains = new Set();\nfor (const c of companies) {\n  for (const raw of [c.company_website, c.company_alternate_domain]) {\n    const d = (raw || '').trim().replace(/\\/+$/, '');\n    if (d && !seenDomains.has(d)) {\n      seenDomains.add(d);\n      allDomains.push(d);\n    }\n  }\n}\n\nconst allJobTitles    = companies.flatMap(c => c.job_titles || []);\nconst functionalLevels = getFunctionalLevels(allJobTitles);\n\nconst apify_body = {\n  company_domain:  allDomains,\n  email_status:    ['validated'],\n  fetch_count:     50,\n  functional_level: functionalLevels,\n  seniority_level: ['owner', 'c_suite', 'director', 'vp', 'head', 'manager']\n};\n\nreturn [{\n  json: {\n    apify_body,\n    batch_companies: companies   // carries company_alternate_domain for Process & Tag\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7792,
+        368
+      ],
+      "id": "2cb70947-dd94-4002-ab60-d4921f7c4ceb",
+      "name": "Prepare Apify Payload",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==========================================================\n// PROCESS & TAG ALL LEADS\n//\n// MATCH PRIORITY (in order):\n//   1. LinkedIn UID  — company_linkedin_uid from Apify vs\n//                      company_linkedin_id in batch (fast, exact)\n//   2. Email domain  — extract domain from lead's work email,\n//                      check against BOTH company_website AND\n//                      company_alternate_domain in batch\n//\n// ROUTES:\n//   raw_lead      → matched lead with valid company_uid\n//   unidentified  → Apify returned a person but zero company\n//                   fields — person data is valid and stored\n//                   in unidentified_poc_leads for dashboard use\n//   no_poc        → company got zero leads back via any path\n//\n// NO-POC DETECTION:\n//   Uses matchedCompanyUids — a company is no_poc only if\n//   ZERO leads matched it (raw_lead OR unidentified both count)\n// ==========================================================\n\nconst PERSONAL_DOMAINS = new Set([\n  'gmail.com','yahoo.com','hotmail.com','outlook.com',\n  'icloud.com','aol.com','me.com','live.com','protonmail.com',\n  'ymail.com','msn.com','mail.com'\n]);\n\nfunction safeUID(val) {\n  const s = String(val ?? '').trim();\n  return (s && s !== '0') ? s : '';\n}\n\nfunction extractDomain(url) {\n  if (!url) return '';\n  return (url + '')\n    .toLowerCase().trim()\n    .replace(/https?:\\/\\//i, '')\n    .split('/')[0]\n    .replace(/^www\\./, '')\n    .trim();\n}\n\nfunction getEmailDomain(email) {\n  if (!email || !email.includes('@')) return '';\n  const d = email.split('@')[1].toLowerCase().trim();\n  return PERSONAL_DOMAINS.has(d) ? '' : d;\n}\n\n// ── Load batch context ────────────────────────────────────────────────────\nconst batchCompanies = $('Prepare Apify Payload').first().json.batch_companies || [];\nconst leads          = items.map(i => i.json);\nconst run_id         = batchCompanies[0]?.run_id || null;\n\n// ── Build LinkedIn UID lookup ─────────────────────────────────────────────\nconst linkedinMap = {};\nfor (const c of batchCompanies) {\n  const uid = safeUID(c.company_linkedin_id);\n  if (uid) linkedinMap[uid] = c;\n}\n\n// ── Build domain lookup (primary + alternate) ─────────────────────────────\nconst domainMap = {};\nfor (const c of batchCompanies) {\n  const primary   = extractDomain(c.company_website);\n  const alternate = extractDomain(c.company_alternate_domain);\n  if (primary)   domainMap[primary]   = c;\n  if (alternate) domainMap[alternate] = c;\n}\n\n// ── Build searched_domain map: domain → company (for unidentified context)\n// Maps the exact domain that was sent to Apify back to the company object\nconst searchedDomainMap = {};\nfor (const c of batchCompanies) {\n  const primary   = extractDomain(c.company_website);\n  const alternate = extractDomain(c.company_alternate_domain);\n  if (primary)   searchedDomainMap[primary]   = c;\n  if (alternate) searchedDomainMap[alternate] = c;\n}\n\n// Track which companies got at least one lead (matched OR unidentified)\nconst matchedCompanyUids = new Set();\n\nconst output = [];\n\n// ── SECTION B: Process each Apify lead ───────────────────────────────────\nfor (const lead of leads) {\n  let matched = null;\n\n  // Path 1 — LinkedIn UID\n  const leadLinkedInUID = safeUID(lead.company_linkedin_uid ?? lead.company_linkedin_id);\n  if (leadLinkedInUID) {\n    matched = linkedinMap[leadLinkedInUID] || null;\n  }\n\n  // Path 2 — Email domain fallback\n  if (!matched) {\n    const workEmailDomain = getEmailDomain(lead.email || '');\n    if (workEmailDomain) {\n      matched = domainMap[workEmailDomain] || null;\n    }\n  }\n\n  // ── Path 3 — Unidentified: valid person, no company link ─────────────\n  // Apify returned this person but with all company fields empty.\n  // We cannot link them to a company_uid (FK constraint) but their\n  // person data is real and valuable. Store in unidentified_poc_leads.\n  if (!matched || !matched.company_uid || String(matched.company_uid) === '0') {\n\n    // Still mark company as \"got results\" if email hints at a searched domain\n    const emailDomain     = getEmailDomain(lead.email || '');\n    const hintedCompany   = emailDomain ? searchedDomainMap[emailDomain] : null;\n    if (hintedCompany) matchedCompanyUids.add(String(hintedCompany.company_uid));\n\n    // Only store if person has at least a name or email — skip truly empty rows\n    const hasPersonData = (lead.first_name || lead.last_name || lead.email || lead.linkedin);\n    if (!hasPersonData) continue;\n\n    output.push({\n      json: {\n        _route: 'unidentified',\n        // Person — always captured\n        first_name:       lead.first_name       || '',\n        last_name:        lead.last_name        || '',\n        full_name:        lead.full_name        || `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),\n        job_title:        lead.job_title        || lead.position || '',\n        headline:         lead.headline         || '',\n        seniority_level:  lead.seniority_level  || lead.seniority || '',\n        email:            lead.email            || '',\n        personal_email:   lead.personal_email   || '',\n        mobile_number:    lead.mobile_number    || lead.phone || '',\n        linkedin:         lead.linkedin         || lead.linkedinUrl || lead.linkedin_url || '',\n        city:             lead.city             || '',\n        state:            lead.state            || '',\n        country:          lead.country          || '',\n        // Company hints — best effort, may be empty\n        inferred_domain:  emailDomain           || '',\n        searched_domain:  hintedCompany ? extractDomain(hintedCompany.company_website) : '',\n        company_size:     lead.company_size     || (hintedCompany ? hintedCompany.company_size : '') || '',\n        industry:         lead.industry         || (hintedCompany ? hintedCompany.company_industry : '') || '',\n        run_id:          run_id\n      }\n    });\n    continue;\n  }\n\n  // ── Matched lead — tag as raw_lead ────────────────────────────────────\n  matchedCompanyUids.add(String(matched.company_uid));\n  const leadDomain = extractDomain(lead.company_website || lead.domain || '');\n\n  output.push({\n    json: {\n      _route: 'raw_lead',\n      first_name:           lead.first_name           || '',\n      last_name:            lead.last_name            || '',\n      full_name:            lead.full_name            || `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),\n      job_title:            lead.job_title            || lead.position || '',\n      headline:             lead.headline             || '',\n      seniority_level:      lead.seniority_level      || lead.seniority || '',\n      email:                lead.email                || '',\n      personal_email:       lead.personal_email       || '',\n      mobile_number:        lead.mobile_number        || lead.phone || '',\n      linkedin:             lead.linkedin             || lead.linkedinUrl || lead.linkedin_url || '',\n      city:                 lead.city                 || '',\n      state:                lead.state                || '',\n      country:              lead.country              || '',\n      company_uid:          matched.company_uid,\n      company_name:         lead.company_name         || matched.company_name      || '',\n      company_domain:       leadDomain,\n      company_website:      lead.company_website      || lead.domain               || '',\n      company_linkedin:     lead.company_linkedin     || lead.company_linkedin_url || '',\n      company_linkedin_uid: leadLinkedInUID           || '',\n      company_size:         lead.company_size         || matched.company_size      || '',\n      industry:             lead.industry             || matched.company_industry  || '',\n      original_job_titles:  (matched.job_titles       || []).join(' | '),\n      run_id:              run_id\n    }\n  });\n}\n\n// ── SECTION A: Tag no-POC companies ──────────────────────────────────────\nfor (const company of batchCompanies) {\n  if (!matchedCompanyUids.has(String(company.company_uid))) {\n    output.push({\n      json: {\n        _route:              'no_poc',\n        company_uid:         company.company_uid,\n        company_name:        company.company_name,\n        company_website:     company.company_website,\n        company_industry:    company.company_industry,\n        job_titles_searched: (company.job_titles || []).join(' | ')\n      }\n    });\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8464,
+        368
+      ],
+      "id": "2fa0af4b-c5ee-4ab3-985c-a0ecebc8fa31",
+      "name": "Process & Tag All Leads",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r001",
+                    "leftValue": "={{ $json._route }}",
+                    "rightValue": "no_poc",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "No POC"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r002",
+                    "leftValue": "={{ $json._route }}",
+                    "rightValue": "raw_lead",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "POC Lead"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "id": "r003",
+                    "leftValue": "={{ $json._route }}",
+                    "rightValue": "unidentified",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Unidentified"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none",
+          "allMatchingOutputs": true
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        8688,
+        352
+      ],
+      "id": "aaaf31e2-8039-4acd-aeb2-aae0a56a39bf",
+      "name": "Route by Type",
+      "executeOnce": false,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keep only the columns that exist in no_poc_companies table\nreturn items\n  .filter(i => i.json._route === 'no_poc')\n  .map(i => ({\n    json: {\n      company_uid:         i.json.company_uid,\n      company_name:        i.json.company_name,\n      company_website:     i.json.company_website,\n      company_industry:    i.json.company_industry,\n      job_titles_searched: i.json.job_titles_searched\n    }\n  }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8912,
+        176
+      ],
+      "id": "07d2a73d-f279-4f02-87c1-6bcef342a883",
+      "name": "Clean → no_poc_companies",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Strip routing/internal fields — keep only poc_leads table columns.\n// Guard 1: drop any item where company_uid is null, 0, or falsy.\n// Guard 2: deduplicate by (company_uid, linkedin) — Apollo returns the\n//          same person twice when a company has multiple domains sent\n//          to Apify (primary + alternate). This prevents duplicate key errors.\n\nconst seen = new Set();\n\nreturn items\n  .filter(i => {\n    const uid = i.json.company_uid;\n    return uid && String(uid) !== '0';\n  })\n  .filter(i => {\n    const linkedin = (i.json.linkedin || '').trim();\n    if (!linkedin) return true; // no linkedin — allow, FK won't deduplicate these\n    const key = `${i.json.company_uid}__${linkedin}`;\n    if (seen.has(key)) return false;\n    seen.add(key);\n    return true;\n  })\n  .map(i => ({\n    json: {\n      company_uid:           i.json.company_uid,\n      first_name:            i.json.first_name            || '',\n      last_name:             i.json.last_name             || '',\n      full_name:             i.json.full_name             || '',\n      job_title:             i.json.job_title             || '',\n      headline:              i.json.headline              || '',\n      seniority_level:       i.json.seniority_level       || '',\n      email:                 i.json.email                 || '',\n      personal_email:        i.json.personal_email        || '',\n      mobile_number:         i.json.mobile_number         || '',\n      linkedin:              i.json.linkedin              || '',\n      city:                  i.json.city                  || '',\n      state:                 i.json.state                 || '',\n      country:               i.json.country               || '',\n      company_name:          i.json.company_name          || '',\n      company_domain:        i.json.company_domain        || '',\n      company_website:       i.json.company_website       || '',\n      company_linkedin:      i.json.company_linkedin      || '',\n      company_linkedin_uid:  i.json.company_linkedin_uid  || '',\n      company_size:          i.json.company_size          || '',\n      industry:              i.json.industry              || '',\n      original_job_titles:   i.json.original_job_titles   || '',\n      run_id:                i.json.run_id                || null\n    }\n  }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8912,
+        416
+      ],
+      "id": "c08be8a4-aa75-47c5-a95c-0ce74b21c961",
+      "name": "Clean → poc_leads",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// PASSTHROUGH — do not write to DB here.\n// poc_leads — written by Create a row1 (Supabase)\n// Pass items through so the loop-back connection fires correctly.\nreturn $input.all();"
+      },
+      "id": "a8213521-a210-4678-b470-de7d653c8c02",
+      "name": "Insert poc_leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9360,
+        656
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "/* =================================================================\n   PHASE 2B — Score Leads (POC Preference Logic)\n   \n   NOTE: _route check intentionally removed.\n   The Switch node upstream already guarantees only raw_lead\n   items reach this node. Adding the check causes silent failures\n   when n8n fan-out doesn't preserve custom fields perfectly.\n   ================================================================= */\n\nconst JOB_CATEGORY_POC_MAP = [\n  { kw: ['controller'], poc: ['finance director','chief financial officer','cfo','head of finance'] },\n  { kw: ['finance manager','finance director','financial analyst','financial controller','financial'], poc: ['finance director','chief financial officer','cfo','head of finance'] },\n  { kw: ['accounting','accountant','accounts payable','accounts receivable'], poc: ['accounting director','chief financial officer','cfo'] },\n  { kw: ['construction manager','construction director','site manager'], poc: ['construction director','construction manager'] },\n  { kw: ['manufacturing','plant manager','production manager'], poc: ['manufacturing director','operations manager','operations director'] },\n  { kw: ['human resources','hr manager','hr director','talent acquisition','recruiter','hris','talent management'], poc: ['head of hr','hr director','recruitment manager','talent acquisition lead'] },\n  { kw: ['operations manager','operations director','vp operations','operations head'], poc: ['operations manager','operations director','vp operations'] },\n  { kw: ['supply chain','logistics','warehouse','distribution','production planning','inventory'], poc: ['manufacturing director','operations manager','operations director','vp operations'] },\n  { kw: ['sales manager','account executive','business development','sales director','head of sales','sales'], poc: ['business development manager','sales director','head of sales'] },\n  { kw: ['banking','loan officer','mortgage','branch manager'], poc: ['branch manager'] },\n  { kw: ['tax analyst','tax manager','tax director','tax accountant','tax specialist'], poc: ['head of tax','tax director','chief financial officer','cfo'] },\n  { kw: ['engineering manager','head of engineering','engineering director','software engineer','mechanical engineer','engineer'], poc: ['head of engineering','director of engineering','vp engineering'] },\n  { kw: ['legal','attorney','counsel','law','litigation','paralegal','compliance'], poc: ['chief administrative officer','managing partner','chief human resources officer','chro','hr director','head of hr'] },\n  { kw: ['real estate','property','maintenance','facilities'], poc: ['director of operations','chief operating officer','coo','hr director'] },\n  { kw: ['executive assistant','office manager','administrative'], poc: ['chief operating officer','coo','chief administrative officer','hr director'] },\n];\n\nconst DEFAULT_POC = [\n  'hr director','head of hr','chro','chief human resources officer',\n  'recruitment manager','talent acquisition lead',\n  'chief operating officer','coo','operations manager','vp operations'\n];\n\nfunction lc(v) { return (v || '').toLowerCase(); }\n\nfunction isPersonalEmail(email) {\n  return /@(gmail|yahoo|outlook|hotmail|icloud|aol|protonmail|me\\.com|live\\.|ymail)/i.test(email || '');\n}\n\n// Hard-reject only truly junior/non-decision-maker roles\n// NOTE: \"administrator\" removed — \"Chief Administrative Officer\" was being falsely rejected\nfunction isHardReject(title) {\n  const t = lc(title);\n  const rejectTerms = [\n    'intern','internship','student','entry level','entry-level',\n    'junior ', ' jr.', ' jr ',\n    'receptionist','secretary','clerk',\n    'temp ','temporary','part-time','part time'\n  ];\n  return rejectTerms.some(k => t.includes(k));\n}\n\nfunction mapJobTitleToPOC(jobTitle) {\n  const t = lc(jobTitle);\n  for (const entry of JOB_CATEGORY_POC_MAP) {\n    if (entry.kw.some(k => t.includes(k))) return entry.poc;\n  }\n  return DEFAULT_POC;\n}\n\nfunction scoreEmail(lead) {\n  const work     = lead.email          || '';\n  const personal = lead.personal_email || '';\n  const li       = lead.linkedin       || '';\n  if (work && !isPersonalEmail(work))  return { score: 30, selected_email: work,     email_type: 'work_verified' };\n  if (work &&  isPersonalEmail(work))  return { score: 20, selected_email: work,     email_type: 'personal_domain' };\n  if (personal)                        return { score: 20, selected_email: personal,  email_type: 'personal' };\n  if (li)                              return { score: 5,  selected_email: null,       email_type: 'linkedin_only' };\n  return                                      { score: -999, selected_email: null,     email_type: 'none' };\n}\n\nfunction scorePOCMatch(leadTitle, preferredTitles) {\n  const lt = lc(leadTitle);\n  for (let i = 0; i < preferredTitles.length; i++) {\n    if (lt.includes(preferredTitles[i])) return Math.max(50 - (i * 3), 10);\n  }\n  return 0;\n}\n\nfunction scoreHRFallback(leadTitle) {\n  const t = lc(leadTitle);\n  return [\n    'hr ',' hr','human resources','talent acquisition','talent management',\n    'people operations','people & culture','people ops','workforce',\n    'recruiter','recruiting','recruitment','staffing','hris','onboarding',\n    'chro','chief human'\n  ].some(k => t.includes(k)) ? 20 : 0;\n}\n\nfunction scoreSeniority(leadTitle) {\n  const t = lc(leadTitle);\n  const tiers = [\n    { terms: ['ceo','coo','cto','cfo','chro','chief ','founder','owner','president','managing partner','c-suite'], pts: 15 },\n    { terms: ['vice president','vp '], pts: 13 },\n    { terms: ['director','head of','partner'], pts: 11 },\n    { terms: ['manager','lead '], pts: 8 },\n    { terms: ['senior ','sr.','sr '], pts: 5 }\n  ];\n  for (const tier of tiers) {\n    if (tier.terms.some(term => t.includes(term))) return tier.pts;\n  }\n  return 0;\n}\n\n// ── Main scoring loop ─────────────────────────────────────────────\nconst scoredLeads = [];\n\nfor (const lead of items.map(i => i.json)) {\n\n  // Skip no_poc router tags if they somehow arrive (defensive only)\n  if (lead._route === 'no_poc') continue;\n\n  const title = lead.job_title || '';\n\n  // Hard reject check\n  if (isHardReject(title)) continue;\n\n  // Email gate — must have at least linkedin to be contactable\n  const emailResult = scoreEmail(lead);\n  if (emailResult.score < 0) continue;\n\n  // Derive preferred POC from original job titles on the company posting\n  const originalJobTitles = (lead.original_job_titles || '')\n    .split(' | ').map(t => t.trim()).filter(Boolean);\n\n  const preferredPOC = originalJobTitles.length > 0\n    ? [...new Set(originalJobTitles.flatMap(jt => mapJobTitleToPOC(jt)))]\n    : DEFAULT_POC;\n\n  // Score all dimensions\n  const pocMatch      = scorePOCMatch(title, preferredPOC);\n  const hrFallback    = pocMatch === 0 ? scoreHRFallback(title) : 0;\n  const seniority     = (pocMatch === 0 && hrFallback === 0) ? scoreSeniority(title) : 0;\n  const linkedinBonus = lead.linkedin ? 5 : 0;\n  const total         = emailResult.score + pocMatch + hrFallback + seniority + linkedinBonus;\n\n  scoredLeads.push({\n    json: {\n      // Score metadata\n      partner_confidence_score: total,\n      _score_breakdown: {\n        email:          emailResult.score,\n        poc_match:      pocMatch,\n        hr_fallback:    hrFallback,\n        seniority,\n        linkedin_bonus: linkedinBonus,\n        total\n      },\n      _context: {\n        original_job_titles:      originalJobTitles,\n        preferred_poc_titles:     preferredPOC,\n        poc_match_fired:          pocMatch > 0,\n        hr_fallback_fired:        hrFallback > 0,\n        seniority_fallback_fired: seniority > 0\n      },\n      poc_id:           lead.poc_id,\n      // Person\n      first_name:      lead.first_name      || '',\n      last_name:       lead.last_name       || '',\n      full_name:       lead.full_name       || '',\n      job_title:       title,\n      headline:        lead.headline        || '',\n      seniority_level: lead.seniority_level || '',\n      selected_email:  emailResult.selected_email,\n      email_type:      emailResult.email_type,\n      email:           lead.email           || '',\n      personal_email:  lead.personal_email  || '',\n      mobile_number:   lead.mobile_number   || '',\n      linkedin:        lead.linkedin        || '',\n      city:            lead.city            || '',\n      state:           lead.state           || '',\n      country:         lead.country         || '',\n      // Company\n      company_uid:          lead.company_uid,\n      company_name:         lead.company_name         || '',\n      company_domain:       lead.company_domain       || '',\n      company_website:      lead.company_website      || '',\n      company_linkedin:     lead.company_linkedin     || '',\n      company_linkedin_uid: lead.company_linkedin_uid || '',\n      company_size:         lead.company_size         || '',\n      industry:             lead.industry             || '',\n      poc_id: lead.poc_id || null, \n      run_id:               lead.run_id               || null\n    }\n  });\n}\n\nreturn scoredLeads;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9808,
+        656
+      ],
+      "id": "1db10f49-5c39-48e0-931f-2c0f8b2191d4",
+      "name": "Score Leads",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "/* =================================================================\n   PHASE 2B — Group by Company → Select Top 2 POCs\n   Tie-breaking order: POC match → email quality → HR fallback → seniority\n   Output includes flattened scores ready for DB insert.\n   ================================================================= */\n\nfunction num(v) { return Number.isFinite(Number(v)) ? Number(v) : 0; }\n\nfunction compareLeads(a, b) {\n  const sb = b._score_breakdown || {}, sa = a._score_breakdown || {};\n  const totalDiff = num(b.partner_confidence_score) - num(a.partner_confidence_score);\n  if (totalDiff !== 0) return totalDiff;\n  for (const field of ['poc_match','email','hr_fallback','seniority']) {\n    const diff = num(sb[field]) - num(sa[field]);\n    if (diff !== 0) return diff;\n  }\n  return 0;\n}\n\nconst allLeads = items.map(i => i.json);\n\nconst byCompany = {};\nfor (const lead of allLeads) {\n  const key = String(lead.company_uid || 'unknown');\n  if (!byCompany[key]) byCompany[key] = [];\n  byCompany[key].push(lead);\n}\n\nconst selected = [];\n\nfor (const [key, leads] of Object.entries(byCompany)) {\n  if (!leads.length) continue;\n\n  const isDirect = leads.length <= 2;\n  const top2 = [...leads].sort(compareLeads).slice(0, 2);\n\n  for (let i = 0; i < top2.length; i++) {\n    const lead = top2[i];\n    const sb   = lead._score_breakdown || {};\n\n    const reasons = [];\n    if (isDirect) {\n      reasons.push(`Direct selection (${leads.length} POC${leads.length > 1 ? 's' : ''} found)`);\n    } else {\n      if (sb.poc_match   > 0) reasons.push(`POC title match (+${sb.poc_match})`);\n      if (sb.hr_fallback > 0) reasons.push(`HR/Talent fallback (+${sb.hr_fallback})`);\n      if (sb.seniority   > 0) reasons.push(`Seniority fallback (+${sb.seniority})`);\n    }\n    reasons.push(`Email: ${lead.email_type} (+${sb.email})`);\n    if (sb.linkedin_bonus) reasons.push(`LinkedIn bonus (+${sb.linkedin_bonus})`);\n\n    const matchType = isDirect\n      ? 'DIRECT_SELECT'\n      : lead._context?.poc_match_fired         ? 'POC_MATCH'\n      : lead._context?.hr_fallback_fired        ? 'HR_FALLBACK'\n      : lead._context?.seniority_fallback_fired ? 'SENIORITY_FALLBACK'\n      : 'LINKEDIN_ONLY';\n\n    selected.push({\n      json: {\n        poc_id:                   lead.poc_id,\n        lead_rank:                i + 1,\n        total_leads_found:        leads.length,\n        selection_reason:         reasons.join(' | '),\n        match_type:               matchType,\n        partner_confidence_score: lead.partner_confidence_score,\n        score_email:              num(sb.email),\n        score_poc_match:          num(sb.poc_match),\n        score_hr_fallback:        num(sb.hr_fallback),\n        score_seniority:          num(sb.seniority),\n        score_linkedin_bonus:     num(sb.linkedin_bonus),\n        first_name:               lead.first_name,\n        last_name:                lead.last_name,\n        full_name:                lead.full_name,\n        job_title:                lead.job_title,\n        selected_email:           lead.selected_email,\n        email_type:               lead.email_type,\n        email:                    lead.email,\n        personal_email:           lead.personal_email,\n        mobile_number:            lead.mobile_number,\n        linkedin:                 lead.linkedin,\n        company_uid:              lead.company_uid,\n        company_name:             lead.company_name,\n        company_domain:           key,\n        industry:                 lead.industry,\n        run_id:                   lead.run_id || null\n      }\n    });\n  }\n}\n\nreturn selected;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10032,
+        656
+      ],
+      "id": "d6e61ff9-c93a-4122-acfb-68e005918f91",
+      "name": "Select Top 2 POCs",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keep only the columns that exist in ranked_pocs table\nreturn items.map(i => ({\n  json: {\n    poc_id:                   i.json.poc_id  || null,\n    company_uid:              i.json.company_uid,\n    lead_rank:                i.json.lead_rank,\n    match_type:               i.json.match_type,\n    partner_confidence_score: i.json.partner_confidence_score,\n    selection_reason:         i.json.selection_reason,\n    score_email:              i.json.score_email,\n    score_poc_match:          i.json.score_poc_match,\n    score_hr_fallback:        i.json.score_hr_fallback,\n    score_seniority:          i.json.score_seniority,\n    score_linkedin_bonus:     i.json.score_linkedin_bonus,\n    total_leads_found:        i.json.total_leads_found,\n    first_name:               i.json.first_name,\n    last_name:                i.json.last_name,\n    full_name:                i.json.full_name,\n    job_title:                i.json.job_title,\n    selected_email:           i.json.selected_email,\n    email_type:               i.json.email_type,\n    email:                    i.json.email,\n    personal_email:           i.json.personal_email,\n    mobile_number:            i.json.mobile_number,\n    linkedin:                 i.json.linkedin,\n    company_name:             i.json.company_name,\n    company_domain:           i.json.company_domain,\n    industry:                 i.json.industry,\n    run_id:                   i.json.run_id  || null\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10256,
+        656
+      ],
+      "id": "d4cff0b4-d122-4ae6-a3ef-52a3a451b448",
+      "name": "Clean → ranked_pocs",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// PASSTHROUGH — do not write to DB here.\n// ranked_pocs — written by Create a row3 (Supabase)\n// Pass items through so the loop-back connection fires correctly.\nreturn $input.all();"
+      },
+      "id": "ddcb8153-4bce-4b28-9180-1f660e4d5f7c",
+      "name": "Insert ranked_pocs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10704,
+        848
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "Datasets",
+        "datasetId": "={{ $json.defaultDatasetId }}",
+        "offset": {},
+        "limit": 500,
+        "options": {}
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        8240,
+        368
+      ],
+      "id": "4057561f-4c3b-4847-bfe3-545bee7324a3",
+      "name": "Get dataset items",
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "apifyApi": {
+          "id": "uLQR9nEOZLgZVnIZ",
+          "name": "Apify account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Create a row1').all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9584,
+        656
+      ],
+      "id": "04735971-bbbc-4ea4-89c4-4de043a78b42",
+      "name": "Recall Leads for Scoring",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input arrives as one wrapper object with an 'items' array inside\nconst wrapper  = $input.all().map(i => i.json);\nconst jobItems = wrapper[0]?.items || wrapper;\n\nconst seenIds = new Set();\nconst uniqueCompanyIds = [];\n\nfor (const job of jobItems) {\n  const cid = String(job.company_id || '').trim();\n  if (cid && !seenIds.has(cid)) {\n    seenIds.add(cid);\n    uniqueCompanyIds.push(cid);\n  }\n}\n\nconst run_id = jobItems[0]?.run_id || null;\n\nreturn [{\n  json: {\n    company_ids: uniqueCompanyIds,\n    job_items:   jobItems,\n    run_id:      run_id\n  }\n}];"
+      },
+      "id": "4875fdc9-7783-4db1-a86b-0c189f84104b",
+      "name": "Extract Company IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6896,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keep only columns that exist in unidentified_poc_leads table.\n// These leads have valid person data but no company_uid linkage.\nreturn items.map(i => ({\n  json: {\n    first_name:       i.json.first_name       || '',\n    last_name:        i.json.last_name        || '',\n    full_name:        i.json.full_name        || '',\n    job_title:        i.json.job_title        || '',\n    headline:         i.json.headline         || '',\n    seniority_level:  i.json.seniority_level  || '',\n    email:            i.json.email            || '',\n    personal_email:   i.json.personal_email   || '',\n    mobile_number:    i.json.mobile_number    || '',\n    linkedin:         i.json.linkedin         || '',\n    city:             i.json.city             || '',\n    state:            i.json.state            || '',\n    country:          i.json.country          || '',\n    inferred_domain:  i.json.inferred_domain  || '',\n    searched_domain:  i.json.searched_domain  || '',\n    company_size:     i.json.company_size     || null,\n    industry:         i.json.industry         || '',\n    run_id:           i.json.run_id           || null\n  }\n}));"
+      },
+      "id": "c92c8c48-bd7b-4b0c-87ac-54a099906a4e",
+      "name": "Clean → unidentified_poc_leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8912,
+        656
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// PASSTHROUGH — do not write to DB here.\n// unidentified_poc_leads — written by Create a row2 (Supabase)\n// Pass items through so the loop-back connection fires correctly.\nreturn $input.all();"
+      },
+      "id": "ed129ac0-9a5d-41b8-958a-d0dd4880b54c",
+      "name": "Insert unidentified_poc_leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9360,
+        848
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "actorId": {
+          "__rl": true,
+          "value": "IoSHqwTR9YGhzccez",
+          "mode": "list",
+          "cachedResultName": "✨Leads Finder - $1.5/1k leads with Emails [Apollo Alternative] (code_crafter/leads-finder)",
+          "cachedResultUrl": "https://console.apify.com/actors/IoSHqwTR9YGhzccez/input"
+        },
+        "customBody": "={{ JSON.stringify($json.apify_body) }}",
+        "timeout": 300
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        8016,
+        368
+      ],
+      "id": "f5b573bc-4fee-4c60-85e3-00ad4db903c1",
+      "name": "Run an Actor",
+      "credentials": {
+        "apifyApi": {
+          "id": "uLQR9nEOZLgZVnIZ",
+          "name": "Apify account"
+        }
+      },
+      "continueOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "gE_eOwwlKSVqDiUgI_d7D",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/gE_eOwwlKSVqDiUgI_d7D",
+          "cachedResultName": "Phase 3 — Email Validation (Error Handled)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        9136,
+        896
+      ],
+      "id": "ae9265d1-2aa4-4b72-b39f-be06c90b7601",
+      "name": "Call 'Phase 3 Email Validation'",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "tableId": "no_poc_companies",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        9136,
+        176
+      ],
+      "id": "2618ea66-12ad-4b23-ae5f-1874ac26fede",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "cJL2NuGhqW82mmcs",
+          "name": "Supabase account"
+        }
+      },
+      "continueOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "unidentified_poc_leads",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        9136,
+        656
+      ],
+      "id": "89aeff92-6792-4f24-bb12-b0e0bf22cc4e",
+      "name": "Create a row2",
+      "credentials": {
+        "supabaseApi": {
+          "id": "cJL2NuGhqW82mmcs",
+          "name": "Supabase account"
+        }
+      },
+      "continueOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "ranked_pocs",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        10480,
+        656
+      ],
+      "id": "acbaca05-6585-41d3-8511-2f59d1a181c3",
+      "name": "Create a row3",
+      "credentials": {
+        "supabaseApi": {
+          "id": "cJL2NuGhqW82mmcs",
+          "name": "Supabase account"
+        }
+      },
+      "continueOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/pipeline_errors",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"workflow\": \"Phase 2B \\u2014 POC Lead Acquisition\", \"node_name\": \"Run an Actor\", \"run_id\": \"{{ $('Extract Company IDs').first()?.json?.run_id ?? 'unknown' }}\", \"severity\": \"WARNING\", \"error_type\": \"APIFY_FAILURE\", \"error_message\": \"{{ $json.error?.message || $json.message || 'Unknown error' }}\", \"item_data\": \"{{ JSON.stringify($json).slice(0,500) }}\"}",
+        "options": {}
+      },
+      "id": "abf377c4-0f5f-4379-b9ae-2d52be8432b4",
+      "name": "Log Error — Actor (2B)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8240,
+        752
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/pipeline_errors",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"workflow\": \"Phase 2B \\u2014 POC Lead Acquisition\", \"node_name\": \"Insert poc_leads\", \"run_id\": \"{{ $('Extract Company IDs').first()?.json?.run_id ?? 'unknown' }}\", \"severity\": \"WARNING\", \"error_type\": \"SUPABASE_WRITE\", \"error_message\": \"{{ $json.error?.message || $json.message || 'Unknown error' }}\", \"item_data\": \"{{ JSON.stringify($json).slice(0,500) }}\"}",
+        "options": {}
+      },
+      "id": "44079ed1-71eb-4764-a033-428e6e346db5",
+      "name": "Log Error — Insert poc_leads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6672,
+        -48
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/pipeline_errors",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"workflow\": \"Phase 2B \\u2014 POC Lead Acquisition\", \"node_name\": \"Insert poc_leads\", \"run_id\": \"{{ $('Extract Company IDs').first()?.json?.run_id ?? 'unknown' }}\", \"severity\": \"WARNING\", \"error_type\": \"SUPABASE_WRITE\", \"error_message\": \"{{ $json.error?.message || $json.message || 'Unknown error' }}\", \"item_data\": \"{{ JSON.stringify($json).slice(0,500) }}\"}",
+        "options": {}
+      },
+      "id": "7e74ae22-70c1-4b42-a984-db619f4ea833",
+      "name": "Log Error — Insert poc_leads1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9360,
+        1040
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/pipeline_errors",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"workflow\": \"Phase 2B \\u2014 POC Lead Acquisition\", \"node_name\": \"Insert poc_leads\", \"run_id\": \"{{ $('Extract Company IDs').first()?.json?.run_id ?? 'unknown' }}\", \"severity\": \"WARNING\", \"error_type\": \"SUPABASE_WRITE\", \"error_message\": \"{{ $json.error?.message || $json.message || 'Unknown error' }}\", \"item_data\": \"{{ JSON.stringify($json).slice(0,500) }}\"}",
+        "options": {}
+      },
+      "id": "156b509c-9ea3-4bf0-8cac-5547ecf63bca",
+      "name": "Log Error — Insert poc_leads2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9360,
+        464
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/pipeline_errors",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"workflow\": \"Phase 2B \\u2014 POC Lead Acquisition\", \"node_name\": \"Insert poc_leads\", \"run_id\": \"{{ $('Extract Company IDs').first()?.json?.run_id ?? 'unknown' }}\", \"severity\": \"WARNING\", \"error_type\": \"SUPABASE_WRITE\", \"error_message\": \"{{ $json.error?.message || $json.message || 'Unknown error' }}\", \"item_data\": \"{{ JSON.stringify($json).slice(0,500) }}\"}",
+        "options": {}
+      },
+      "id": "3f7b653b-484a-4102-9375-4d2d7fdbe8a6",
+      "name": "Log Error — Insert poc_leads3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10704,
+        1424
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4b7da267-d047-4392-ab30-b4fd411a63af",
+              "leftValue": "={{ $json.ranked_poc_id }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        8912,
+        896
+      ],
+      "id": "784d6292-06cd-4963-9ec1-f586fa231b6e",
+      "name": "If",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://sgnxqspceytihmoynclg.supabase.co/rest/v1/runs?run_id=eq.={{ $('Extract Company IDs').first().json.run_id }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"pipeline_status\": \"empty\",\n  \"run_summary\": \"Pipeline completed but 0 decision-maker contacts found for these companies.\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        9136,
+        1232
+      ],
+      "id": "2c98fac4-40a2-4d2b-adcd-6d10fd4d360b",
+      "name": "HTTP Request",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "tableId": "poc_leads",
+        "dataToSend": "autoMapInputData"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        9136,
+        416
+      ],
+      "id": "4c606f20-488e-471e-b2bc-d5d4d26d989c",
+      "name": "Create a row1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "cJL2NuGhqW82mmcs",
+          "name": "Supabase account"
+        }
+      },
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop Safeguard: ensures Split in Batches always gets the loop-back signal\n// even when upstream nodes fail or produce empty results.\n// Returns empty array so Split in Batches advances to next batch cleanly.\nreturn [];"
+      },
+      "id": "093f866f-89b7-42d4-a370-01b2fbda0f69",
+      "name": "Loop Safeguard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9360,
+        272
+      ],
+      "continueOnFail": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Read companies": {
+      "main": [
+        [
+          {
+            "node": "Merge & Deduplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge & Deduplicate": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches (10)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split in Batches (10)": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Apify Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Apify Payload": {
+      "main": [
+        [
+          {
+            "node": "Run an Actor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process & Tag All Leads": {
+      "main": [
+        [
+          {
+            "node": "Route by Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Type": {
+      "main": [
+        [
+          {
+            "node": "Clean → no_poc_companies",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clean → poc_leads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clean → unidentified_poc_leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean → no_poc_companies": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean → poc_leads": {
+      "main": [
+        [
+          {
+            "node": "Create a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Leads": {
+      "main": [
+        [
+          {
+            "node": "Select Top 2 POCs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Top 2 POCs": {
+      "main": [
+        [
+          {
+            "node": "Clean → ranked_pocs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean → ranked_pocs": {
+      "main": [
+        [
+          {
+            "node": "Create a row3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert ranked_pocs": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches (10)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert poc_leads": {
+      "main": [
+        [
+          {
+            "node": "Recall Leads for Scoring",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get dataset items": {
+      "main": [
+        [
+          {
+            "node": "Process & Tag All Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recall Leads for Scoring": {
+      "main": [
+        [
+          {
+            "node": "Score Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "▶ Start: Triggered by Phase 1": {
+      "main": [
+        [
+          {
+            "node": "Extract Company IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Company IDs": {
+      "main": [
+        [
+          {
+            "node": "Read companies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean → unidentified_poc_leads": {
+      "main": [
+        [
+          {
+            "node": "Create a row2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run an Actor": {
+      "main": [
+        [
+          {
+            "node": "Get dataset items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Actor (2B)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row2": {
+      "main": [
+        [
+          {
+            "node": "Insert unidentified_poc_leads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Insert poc_leads1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row3": {
+      "main": [
+        [
+          {
+            "node": "Insert ranked_pocs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Insert poc_leads3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Loop Safeguard",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Insert poc_leads2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Call 'Phase 3 Email Validation'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row1": {
+      "main": [
+        [
+          {
+            "node": "Insert poc_leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Phase 3 Email Validation'": {
+      "main": [
+        [
+          {
+            "node": "Loop Safeguard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Loop Safeguard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Safeguard": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches (10)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "5b628a3e-dcac-4826-86b1-0b3a50ae08e3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1ec8813f30fac48c9544a21b6fbcdbe1ca359e4b4109f04b0dfe5b5cfb3ecc5d"
+  },
+  "id": "VcaeFPTtJJu9ak7bud0gf",
+  "tags": []
+}

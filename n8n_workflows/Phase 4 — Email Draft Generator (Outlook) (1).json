@@ -1,0 +1,689 @@
+{
+  "name": "Phase 4 — Email Draft Generator (Outlook)",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst run_id = body.run_id;\nif (!run_id) throw new Error('run_id is required in the request body');\nreturn [{ json: { run_id } }];"
+      },
+      "id": "6ed15bcf-018a-4ccf-a04c-59574e1e7f2c",
+      "name": "Extract Run ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2496,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://sgnxqspceytihmoynclg.supabase.co/rest/v1/ranked_pocs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "ranked_poc_id,poc_id,first_name,full_name,job_title,selected_email,company_name,company_uid,lead_rank,run_id"
+            },
+            {
+              "name": "run_id",
+              "value": "={{ 'eq.' + $('Extract Run ID').first().json.run_id }}"
+            },
+            {
+              "name": "selected_email",
+              "value": "not.is.null"
+            },
+            {
+              "name": "order",
+              "value": "lead_rank.asc"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cfeb2468-9f86-4c80-863c-ab576d57b07e",
+      "name": "Fetch Validated POCs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2288,
+        -128
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const pocs = $input.all().map(i => i.json);\nif (!pocs.length) throw new Error('No POCs found for run_id: ' + $('Extract Run ID').first().json.run_id);\n\nconst pocIds       = [...new Set(pocs.map(p => p.poc_id).filter(Boolean))];\nconst companyUids  = [...new Set(pocs.map(p => p.company_uid).filter(Boolean))];\nconst run_id       = pocs[0]?.run_id || $('Extract Run ID').first().json.run_id;\n\nreturn [{ json: { pocIds, companyUids, run_id, pocCount: pocs.length } }];"
+      },
+      "id": "3f3f4ad0-62d1-498c-8a84-d76c9c620f9c",
+      "name": "Extract IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2064,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://sgnxqspceytihmoynclg.supabase.co/rest/v1/ranked_poc_email_validations",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "poc_id,email_quality,email_result,subresult"
+            },
+            {
+              "name": "poc_id",
+              "value": "={{ 'in.(' + $('Extract IDs').first().json.pocIds.join(',') + ')' }}"
+            },
+            {
+              "name": "email_result",
+              "value": "eq.ok"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e84641c1-053d-4c12-a7b1-5f750dc42558",
+      "name": "Fetch Email Validations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1840,
+        -128
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "=https://sgnxqspceytihmoynclg.supabase.co/rest/v1/job_details",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "job_title,location,company_id"
+            },
+            {
+              "name": "run_id",
+              "value": "={{ 'eq.' + $('Extract IDs').first().json.run_id }}"
+            },
+            {
+              "name": "company_id",
+              "value": "={{ 'in.(' + $('Extract IDs').first().json.companyUids.join(',') + ')' }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4549dc7b-ea44-4f9d-ab13-16c846a03ca3",
+      "name": "Fetch Job Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1616,
+        -128
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "=https://sgnxqspceytihmoynclg.supabase.co/rest/v1/companies",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "company_uid,company_locality"
+            },
+            {
+              "name": "company_uid",
+              "value": "={{ 'in.(' + $('Extract IDs').first().json.companyUids.join(',') + ')' }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9b26412f-12b4-4bf0-badc-9a32c2931a71",
+      "name": "Fetch Company Localities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1408,
+        -128
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "=https://sgnxqspceytihmoynclg.supabase.co/rest/v1/email_templates",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "template_id,name,subject,body"
+            },
+            {
+              "name": "is_active",
+              "value": "eq.true"
+            },
+            {
+              "name": "order",
+              "value": "sort_order.asc"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "41e4a902-ac74-4034-ae48-5b0c33c5f658",
+      "name": "Fetch Active Templates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1184,
+        -128
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gather all upstream data\nconst pocs       = $('Fetch Validated POCs').all().map(i => i.json);\nconst validations = $('Fetch Email Validations').all().map(i => i.json);\nconst jobs        = $('Fetch Job Details').all().map(i => i.json);\nconst localities  = $('Fetch Company Localities').all().map(i => i.json);\nconst run_id      = $('Extract IDs').first().json.run_id;\n\n// Build lookup maps\nconst validMap = {};\nfor (const v of validations) validMap[v.poc_id] = v;\n\nconst jobMap = {};\nfor (const j of jobs) {\n  if (!jobMap[j.company_id]) jobMap[j.company_id] = j;\n}\n\nconst localMap = {};\nfor (const l of localities) localMap[l.company_uid] = l.company_locality || '';\n\n// Build one item per POC with valid email\nconst queue = [];\nfor (const poc of pocs) {\n  const validation = validMap[poc.poc_id];\n  if (!validation) continue;\n  if (!poc.selected_email) continue;\n\n  const job      = jobMap[poc.company_uid] || {};\n  const location = localMap[poc.company_uid] || '';\n  const firstName = poc.first_name\n    || (poc.full_name || '').split(' ')[0]\n    || 'there';\n\n  queue.push({ json: {\n    ranked_poc_id:    poc.ranked_poc_id,\n    poc_id:           poc.poc_id,\n    first_name:       firstName,\n    full_name:        poc.full_name || poc.first_name || '',\n    poc_title:        poc.job_title || '',\n    to_email:         poc.selected_email,\n    company_name:     poc.company_name || '',\n    company_uid:      poc.company_uid,\n    hiring_job_title: job.job_title || '',\n    job_location:     location,\n    run_id,\n    email_quality:    validation.email_quality || '',\n  }});\n}\n\nif (queue.length === 0) {\n  throw new Error('No POCs with validated emails (email_result=ok) found for this run.');\n}\n\nreturn queue;"
+      },
+      "id": "a11ab281-83b6-43af-8410-6bb958fd9059",
+      "name": "Build Draft Queue",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        -128
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "761fd393-49cd-47d2-af8f-8b74d03676b5",
+      "name": "Split in Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -720,
+        -352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const poc = $input.first().json;\n\n// Get active templates from upstream node\nconst templates = $('Fetch Active Templates').all().map(i => i.json)\n  .filter(t => t.body && t.subject);\n\nif (!templates.length) throw new Error('No active email templates found in database.');\n\n// Pick a random template\nconst template = templates[Math.floor(Math.random() * templates.length)];\n\n// Simple variable substitution\nfunction render(str) {\n  return (str || '')\n    .replace(/\\{first_name\\}/g, poc.first_name || 'there')\n    .replace(/\\{job_title\\}/g,  poc.hiring_job_title || '')\n    .replace(/\\{location\\}/g,   poc.job_location || '');\n}\n\nconst rendered_subject = render(template.subject);\nconst rendered_body    = render(template.body);\n\nreturn [{ json: {\n  ...poc,\n  rendered_subject,\n  rendered_body,\n  template_id:   template.template_id,\n  template_name: template.name,\n}}];"
+      },
+      "id": "ab17c57b-bdfe-4c0c-bfe0-ae4770008832",
+      "name": "Render Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        -240
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $json.rendered_subject }}",
+        "message": "={{ $json.rendered_body }}",
+        "options": {}
+      },
+      "id": "c7602e24-5f89-45ba-a0e6-37164a4ae486",
+      "name": "Create Gmail Draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        -32,
+        -240
+      ],
+      "webhookId": "bf72fad9-7fa8-438d-85c7-d23a77f67b7b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "LPpTN0MhoD7669RL",
+          "name": "Gmail account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the POC data from Render Email node\nconst poc = $('Render Email').first().json;\n\n// Get Gmail result (may have error if Gmail failed)\nconst gmailResult = $input.first().json;\nconst gmailError  = gmailResult.error;\n\n// Gmail draft ID is in gmailResult.id\nconst gmailDraftId = gmailResult.id || null;\nconst status = gmailError ? 'failed' : 'draft';\n\nreturn [{ json: {\n  run_id:           poc.run_id,\n  ranked_poc_id:    poc.ranked_poc_id,\n  poc_id:           poc.poc_id,\n  to_email:         poc.to_email,\n  to_name:          poc.full_name,\n  company_name:     poc.company_name,\n  hiring_job_title: poc.hiring_job_title,\n  poc_title:        poc.poc_title,\n  job_location:     poc.job_location,\n  subject:          poc.rendered_subject,\n  body:             poc.rendered_body,\n  template_id:      poc.template_id,\n  template_name:    poc.template_name,\n  status,\n  gmail_draft_id:   gmailDraftId,\n}}];"
+      },
+      "id": "a745c828-082c-4c92-934d-138ee634f7fd",
+      "name": "Save Draft Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        -240
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/email_drafts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { 'run_id': $json.run_id, 'ranked_poc_id': $json.ranked_poc_id, 'poc_id': $json.poc_id, 'to_email': $json.to_email, 'to_name': $json.to_name, 'company_name': $json.company_name, 'hiring_job_title': $json.hiring_job_title, 'poc_title': $json.poc_title, 'job_location': $json.job_location, 'subject': $json.subject, 'body': $json.body, 'template_id': $json.template_id, 'template_name': $json.template_name, 'status': $json.status, 'outlook_draft_id': $json.gmail_draft_id } }}",
+        "options": {}
+      },
+      "id": "3a3dc698-5b0e-455d-b259-2079c7b70bb9",
+      "name": "Insert Draft to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        -240
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all();"
+      },
+      "id": "27a30712-dae9-4642-b7ec-65a653a840c6",
+      "name": "Loop Safeguard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        -240
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://sgnxqspceytihmoynclg.supabase.co/rest/v1/runs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "run_id",
+              "value": "={{ 'eq.' + $('Extract IDs').first().json.run_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"pipeline_status\": \"emails_drafted\", \"run_summary\": \"Email drafts created in Outlook for \" + $(\"Build Draft Queue\").all().length + \" contacts.\" } }}",
+        "options": {}
+      },
+      "id": "473aee5d-e47b-4afa-bcb9-bf8a4d0f5213",
+      "name": "Update Run Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -480,
+        48
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Email drafts queued for run: \" + $(\"Extract IDs\").first().json.run_id, \"drafts_queued\": $(\"Build Draft Queue\").all().length } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "2e2c85da-a6d7-4483-a6a7-e44eece10343",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -32,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "email-draft-generator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2832,
+        -144
+      ],
+      "id": "af56cf28-d13e-4afa-95cf-889463c0cfbe",
+      "name": "Webhook",
+      "webhookId": "70d60f47-763e-4af5-a86f-e4efe2c1646b"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Extract Run ID": {
+      "main": [
+        [
+          {
+            "node": "Fetch Validated POCs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Validated POCs": {
+      "main": [
+        [
+          {
+            "node": "Extract IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract IDs": {
+      "main": [
+        [
+          {
+            "node": "Fetch Email Validations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Email Validations": {
+      "main": [
+        [
+          {
+            "node": "Fetch Job Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Job Details": {
+      "main": [
+        [
+          {
+            "node": "Fetch Company Localities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Company Localities": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Templates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Templates": {
+      "main": [
+        [
+          {
+            "node": "Build Draft Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Draft Queue": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split in Batches": {
+      "main": [
+        [
+          {
+            "node": "Update Run Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Render Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Email": {
+      "main": [
+        [
+          {
+            "node": "Create Gmail Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Draft Record": {
+      "main": [
+        [
+          {
+            "node": "Insert Draft to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Draft to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Loop Safeguard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Safeguard": {
+      "main": [
+        [
+          {
+            "node": "Split in Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Run Status": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Gmail Draft": {
+      "main": [
+        [
+          {
+            "node": "Save Draft Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Run ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "72cb4abe-3270-40fe-8f97-a819f8db1df1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1ec8813f30fac48c9544a21b6fbcdbe1ca359e4b4109f04b0dfe5b5cfb3ecc5d"
+  },
+  "id": "fN4Tn096EKXW5cGl",
+  "tags": []
+}

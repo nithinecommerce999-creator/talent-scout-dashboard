@@ -44,7 +44,7 @@ type PipelineState =
   | 'done'
   | 'aborted';
 
-const WEBHOOK_URL = "https://primary-production-a8093.up.railway.app/webhook/harvestapi-jobs-pipeline-v2";
+const WEBHOOK_URL = "https://primary-production-9f142.up.railway.app/webhook/harvestapi-jobs-pipeline-v2";
 
 const PHASE_LABELS: Record<PipelineState, string> = {
   idle:           '',

@@ -1,0 +1,1533 @@
+{
+  "name": "Phase 1 — HarvestAPI Job Search (Error Handled)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "harvestapi-jobs-pipeline-v2",
+        "options": {}
+      },
+      "id": "91905155-e4f3-432c-876f-8bc2a2206af8",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -26432,
+        12608
+      ],
+      "webhookId": "faec558a-9ee0-4476-8657-5b5ba90a945b"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nif (!body.jobTitles || (Array.isArray(body.jobTitles) && body.jobTitles.length === 0) || (typeof body.jobTitles === 'string' && body.jobTitles.trim() === '')) {\n  throw new Error('Validation failed: jobTitles is required and must not be empty.');\n}\nreturn [{ json: {\n    jobTitles:       Array.isArray(body.jobTitles)       ? body.jobTitles       : (body.jobTitles ? [body.jobTitles] : []),\n    industryIds:     Array.isArray(body.industryIds)     ? body.industryIds     : (body.industryIds ? [body.industryIds] : []),\n    geoIds:          Array.isArray(body.geoIds)          ? body.geoIds          : (body.geoIds ? [body.geoIds] : ['103644278']),\n    workplaceType:   Array.isArray(body.workplaceType)   ? body.workplaceType   : ['office', 'hybrid'],\n    employmentType:  Array.isArray(body.employmentType)  ? body.employmentType  : ['full-time'],\n    experienceLevel: Array.isArray(body.experienceLevel) ? body.experienceLevel : ['mid-senior', 'director'],\n    postedLimit:     body.postedLimit  || '24h',\n    maxItems:        body.maxItems     || 100,\n    sortBy:          body.sortBy       || 'date',\n    under10Applicants: body.under10Applicants === true ? true : false,\n  }\n}];"
+      },
+      "id": "514b9e34-a0e9-42b3-8bbd-6d9cb1478d4b",
+      "name": "Extract Search Params",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -26208,
+        12608
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/runs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "run_date",
+              "value": "={{ 'eq.' + $today.toFormat('yyyy-MM-dd') }}"
+            },
+            {
+              "name": "select",
+              "value": "run_id,run_date,run_label"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "403e2b0c-2715-4fb8-af63-2d6f018b678a",
+      "name": "Count Today Runs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -25984,
+        12608
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/companies",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "company_uid"
+            },
+            {
+              "name": "limit",
+              "value": "100000"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e9badfef-6224-40c1-8a2a-1289651dd80c",
+      "name": "Get many rows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -25760,
+        12608
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $('Extract Search Params').first().json;\nreturn [{ json: {\n    actor_input: {\n      industryIds: p.industryIds, jobTitles: p.jobTitles, geoIds: p.geoIds,\n      workplaceType: p.workplaceType, employmentType: p.employmentType,\n      experienceLevel: p.experienceLevel, postedLimit: p.postedLimit,\n      maxItems: p.maxItems, sortBy: p.sortBy, under10Applicants: p.under10Applicants,\n    },\n    search_summary: `${p.jobTitles.join(', ')} | ${p.postedLimit}`\n  }\n}];"
+      },
+      "id": "5e596fff-b00b-485b-9574-487d9ace528f",
+      "name": "Build Actor Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -25536,
+        12608
+      ]
+    },
+    {
+      "parameters": {
+        "actorId": {
+          "__rl": true,
+          "value": "zn01OAlzP853oqn4Z",
+          "mode": "list",
+          "cachedResultName": "HarvestAPI LinkedIn Job Search",
+          "cachedResultUrl": "https://console.apify.com/actors/zn01OAlzP853oqn4Z/input"
+        },
+        "customBody": "={{ JSON.stringify($json.actor_input) }}",
+        "timeout": 600
+      },
+      "id": "e8cc0b83-2ffd-46ce-9a2a-8835981da177",
+      "name": "Run harvestapi/linkedin-job-search",
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        -25312,
+        12608
+      ],
+      "credentials": {
+        "apifyApi": {
+          "id": "uLQR9nEOZLgZVnIZ",
+          "name": "Apify account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/rpc/log_pipeline_error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \n  p_workflow: 'Phase 1 — HarvestAPI Job Search', \n  p_node_name: 'Run harvestapi/linkedin-job-se', \n  p_run_id: 'unknown',\n  p_severity: 'CRITICAL', \n  p_error_type: 'APIFY_FAILURE', \n  p_error_message: ($json.error?.message || $json.message || String($json.error || 'Unknown')).slice(0,500), \n  p_item_data: { preview: JSON.stringify($json).slice(0, 800) }, \n  p_phase: 'phase_1' \n} }}",
+        "options": {}
+      },
+      "id": "39963935-d20e-4715-912e-955ec8765646",
+      "name": "Log Error — Run harvestapi/linkedin-job-se",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -25088,
+        12704
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "run_id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "2",
+              "name": "run_date",
+              "value": "={{ $json.startedAt.slice(0, 10) }}",
+              "type": "string"
+            },
+            {
+              "id": "3",
+              "name": "started_at",
+              "value": "={{ $json.startedAt }}",
+              "type": "string"
+            },
+            {
+              "id": "4",
+              "name": "finished_at",
+              "value": "={{ $json.finishedAt }}",
+              "type": "string"
+            },
+            {
+              "id": "5",
+              "name": "dataset_id",
+              "value": "={{ $json.defaultDatasetId }}",
+              "type": "string"
+            },
+            {
+              "id": "6",
+              "name": "status",
+              "value": "={{ $json.status }}",
+              "type": "string"
+            },
+            {
+              "id": "7",
+              "name": "record_count",
+              "value": "={{ $json.usage?.DATASET_WRITES ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "8",
+              "name": "duration_secs",
+              "value": "={{ $json.stats?.runTimeSecs ?? 0 }}",
+              "type": "number"
+            },
+            {
+              "id": "9",
+              "name": "cost_usd",
+              "value": "={{ $json.usageTotalUsd ?? 0 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "76793d44-3489-4239-8080-ad503feb3ccf",
+      "name": "Extract Run Meta",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -25088,
+        12512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allRuns = $('Count Today Runs').all();\nconst existingRunsToday = allRuns.filter(r => r.json && r.json.run_id).length;\nconst sequence = existingRunsToday + 1;\nconst meta = $('Extract Run Meta').first().json;\nfunction ordinal(n) { const s = ['th','st','nd','rd']; const v = n % 100; return n + (s[(v-20)%10] || s[v] || s[0]); }\nconst runLabel = `${meta.run_date} Run ${sequence} (${ordinal(sequence)} run of day)`;\nreturn [{ json: { ...meta, run_sequence_of_day: sequence, run_label: runLabel } }];"
+      },
+      "id": "c7a9b9a7-ff25-4f21-80bc-fa535708069d",
+      "name": "Build Run Tag",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -24864,
+        12512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/runs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { 'run_id': $json.run_id, 'run_date': $json.run_date, 'started_at': $json.started_at, 'finished_at': $json.finished_at, 'run_sequence_of_day': Number($json.run_sequence_of_day) || 1, 'run_label': $json.run_label, 'dataset_id': $json.dataset_id, 'record_count': Number($json.record_count) || 0, 'status': $json.status, 'duration_secs': Number($json.duration_secs) || 0, 'cost_usd': Number($json.cost_usd) || 0, 'pipeline_status': 'running', 'run_summary': JSON.stringify($('Build Actor Input').first().json.actor_input) } }}",
+        "options": {}
+      },
+      "id": "e4e4b48c-15ff-40e5-9149-bf3f5c009189",
+      "name": "Insert Run Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -24640,
+        12512
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/rpc/log_pipeline_error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_workflow: 'Phase 1 — HarvestAPI Job Search', p_node_name: 'Insert Run Record', p_run_id: $('Build Run Tag').first().json.run_id, p_severity: 'WARNING', p_error_type: 'SUPABASE_WRITE', p_error_message: ($json.error?.message || $json.message || String($json.error || 'Unknown')).slice(0,500), p_item_data: { preview: JSON.stringify($json).slice(0, 800) }, p_phase: 'phase_1' } }}",
+        "options": {}
+      },
+      "id": "e3dc16ec-dd89-4db5-a910-2a647f6e6ec9",
+      "name": "Log Error — Insert Run Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -24416,
+        12608
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/rpc/mark_phase_started",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_run_id: $('Build Run Tag').first().json.run_id, p_phase: 'phase_1' } }}",
+        "options": {}
+      },
+      "id": "613351df-ba0c-4d60-9cd3-c021133e7f12",
+      "name": "Phase 1: Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -24416,
+        12416
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "Datasets",
+        "datasetId": "={{ $('Build Run Tag').first().json.dataset_id }}",
+        "offset": {},
+        "limit": 1000,
+        "options": {}
+      },
+      "id": "9cb7a015-e112-4789-940d-e135593fb92d",
+      "name": "Get dataset items",
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        -24192,
+        12416
+      ],
+      "credentials": {
+        "apifyApi": {
+          "id": "uLQR9nEOZLgZVnIZ",
+          "name": "Apify account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/rpc/log_pipeline_error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_workflow: 'Phase 1 — HarvestAPI Job Search', p_node_name: 'Get dataset items', p_run_id: $('Build Run Tag').first().json.run_id, p_severity: 'WARNING', p_error_type: 'UNKNOWN', p_error_message: ($json.error?.message || $json.message || String($json.error || 'Unknown')).slice(0,500), p_item_data: { preview: JSON.stringify($json).slice(0, 800) }, p_phase: 'phase_1' } }}",
+        "options": {}
+      },
+      "id": "b332a3f0-68e8-48a5-a3da-5ada5f908104",
+      "name": "Log Error — Get dataset items",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -23968,
+        12512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  const d=item.json, company=d.company||{}, hiringTeam=Array.isArray(d.hiringTeam)?d.hiringTeam:[], recruiter=hiringTeam[0]||{}, applyMethod=d.applyMethod||{};\n  const jobUrn=String(d.id||d.jobId||'').trim(), jobId=jobUrn.includes(':')?jobUrn.split(':').pop():jobUrn;\n  const jobUrl=d.url||d.linkedinUrl||(jobId?`https://www.linkedin.com/jobs/view/${jobId}`:'');\n  let applicantCount=0; const rawAppl=d.applicants;\n  if(typeof rawAppl==='number') applicantCount=rawAppl;\n  else if(typeof rawAppl==='string'){const m=rawAppl.match(/\\d+/); applicantCount=m?parseInt(m[0]):0;}\n  const range=company.employeeCountRange||{}; let companySizeStr='';\n  if(range.end===null||range.end===undefined) companySizeStr=range.start?'10,001+ employees':'';\n  else if(range.start!=null&&range.end!=null) companySizeStr=`${range.start.toLocaleString()}-${range.end.toLocaleString()} employees`;\n  const industriesArr=(Array.isArray(d.industries)&&d.industries.length>0)?d.industries:(Array.isArray(company.industries)?company.industries:[]);\n  const industryLabel=industriesArr.length>0?(typeof industriesArr[0]==='string'?industriesArr[0]:(industriesArr[0].name||industriesArr[0].title||'')): '';\n  const companyLocs=Array.isArray(company.locations)?company.locations:[], hq=companyLocs[0]||{};\n  const companyLocality=[hq.city,hq.geographicArea,hq.country].filter(Boolean).join(', ');\n  const companyProfile=company.linkedinUrl||(company.universalName?`https://www.linkedin.com/company/${company.universalName}`:'')||(company.id?`https://www.linkedin.com/company/${company.id}`:'');\n  const jobLocation=typeof d.location==='string'?d.location:[d.location?.city,d.location?.state,d.location?.country].filter(Boolean).join(', ');\n  let postedDatetime=null; try{const rawDate=d.postedAt||d.postedDate||d.listedAt; postedDatetime=rawDate?new Date(rawDate).toISOString():new Date().toISOString();}catch(e){postedDatetime=new Date().toISOString();}\n  const salaryObj=d.salary||d.salaryInfo||{}; let baseSalary=null;\n  if(salaryObj.min!=null&&salaryObj.max!=null) baseSalary=`${salaryObj.currency||'$'}${salaryObj.min}\\u2013${salaryObj.max} ${salaryObj.period||''}`.trim();\n  else if(salaryObj.text) baseSalary=salaryObj.text;\n  const applyUrl=applyMethod.companyApplyUrl||applyMethod.easyApplyUrl||jobUrl;\n  const recruiterName=recruiter.name||recruiter.fullName||null, recruiterProfile=recruiter.profileUrl||recruiter.linkedinUrl||null, recruiterDetail=recruiter.headline||recruiter.title||null;\n  let companyDomain=''; const websiteRaw=company.website||'';\n  if(websiteRaw){try{const urlObj=new URL(websiteRaw.startsWith('http')?websiteRaw:`https://${websiteRaw}`); companyDomain=urlObj.hostname.replace(/^www\\./,'');}catch(e){companyDomain=websiteRaw.replace(/^https?:\\/\\//,'').replace(/^www\\./,'').split('/')[0];}}\n  return{json:{job_urn:jobUrn,job_id:jobId,job_url:jobUrl,title:d.title||'',location:jobLocation,posted_datetime:postedDatetime,description_text:d.description||d.descriptionText||'',seniority_level:d.seniorityLevel||d.experienceLevel||'',employment_type:d.employmentType||'',base_salary:baseSalary,apply_url:applyUrl,applicants_count:applicantCount,applicants:applicantCount===0?'':`${applicantCount} applicants`,company_id:String(company.id||'').trim(),company_name:company.name||'',company_profile:companyProfile,company_website:company.website||'',company_domain:companyDomain,company_size:companySizeStr,company_locality:companyLocality,company_industry:industryLabel,company_description:company.description||null,company_founded:company.founded||null,company_followers:company.followerCount||null,employeeCountRange:company.employeeCountRange||null,employeeCount:company.employeeCount||null,industries:industriesArr,recruiter_name:recruiterName,recruiter_detail:recruiterDetail,recruiter_profile:recruiterProfile,hiring_team_count:hiringTeam.length}};\n});"
+      },
+      "id": "835db692-c8d8-4ac8-8ef2-bdce12120638",
+      "name": "Parse & Extract Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -23968,
+        12320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const staffingKeywords=['staffing','recruiting','recruitment','headhunter','talent acquisition','talent solutions','talent agency','executive search','placement agency','manpower','workforce solutions','contract staffing','temp agency','temporary staffing','contingent workforce','outsourcing','hr solutions','hr services','people solutions','search firm','hiring solutions','staff augmentation','contract hire','direct hire','perm placement'];\nconst columnsToCheck=['title','company_name','location','company_industry','company_locality','company_size'];\nfunction isGarbageOrNonEnglish(str){if(!str||typeof str!=='string')return false; const cleaned=str.trim(); if(!cleaned)return false; if(/[\\u3000-\\u9fff\\uac00-\\ud7af\\uf900-\\ufaff]/.test(cleaned))return true; if(/[\\u0400-\\u04ff\\u0600-\\u06ff\\u0900-\\u097f\\u0e00-\\u0e7f\\u05d0-\\u05ea]/.test(cleaned))return true; const nonAscii=(cleaned.match(/[^\\x00-\\x7f]/g)||[]).length; if(nonAscii/cleaned.length>0.3)return true; const words=cleaned.split(/\\s+/); const gibberishWords=words.filter(w=>{if(w.length<5)return false; const letters=w.replace(/[^a-zA-Z]/g,''); if(letters.length<4)return false; const vowels=(letters.match(/[aeiouAEIOU]/g)||[]).length; return vowels/letters.length<0.1;}); if(gibberishWords.length>0)return true; const specialChars=(cleaned.match(/[^a-zA-Z0-9\\s.,\\-'&()\\/!?@#%:]/g)||[]).length; if(specialChars/cleaned.length>0.25)return true; return false;}\nconst allItems=$input.all(), filteredItems=[], skippedItems=[];\nallItems.forEach(item=>{const company=(item.json.company_name||'').toLowerCase(); const hasStaffingKeyword=staffingKeywords.some(kw=>company.includes(kw)); if(hasStaffingKeyword){skippedItems.push({company:item.json.company_name,title:item.json.title,skip_reason:'Staffing keyword',bad_value:item.json.company_name}); return;} let skipped=false; for(const col of columnsToCheck){if(isGarbageOrNonEnglish(item.json[col])){skippedItems.push({company:item.json.company_name,title:item.json.title,skip_reason:`Non-English: \"${col}\"`,bad_value:item.json[col]}); skipped=true; break;}} if(!skipped)filteredItems.push(item);});\nconst result=filteredItems.map(item=>({...item,json:{...item.json,_skipped_nonenglish_count:skippedItems.length,_skipped_nonenglish_rows:skippedItems}}));\nconsole.log(`Non-English filter: ${allItems.length} -> ${filteredItems.length}`);\nreturn result;"
+      },
+      "id": "ec12ce34-5303-4c7e-98e8-247018eea4cb",
+      "name": "Filter: Non English rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -23744,
+        12320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const MAX_APPLICANTS=30, allItems=$input.all(), filteredItems=[], skippedItems=[];\nallItems.forEach(item=>{const count=item.json.applicants_count||0; if(!item.json.applicants){filteredItems.push(item);return;} if(count<=MAX_APPLICANTS) filteredItems.push(item); else skippedItems.push({company:item.json.company_name,title:item.json.title,skip_reason:`Too many applicants (${count})`,bad_value:count});});\nconst result=filteredItems.map(item=>({...item,json:{...item.json,_skipped_applicant_count:skippedItems.length,_skipped_applicant_rows:skippedItems}}));\nconsole.log(`Applicants filter (max ${MAX_APPLICANTS}): ${allItems.length} -> ${filteredItems.length}`);\nreturn result;"
+      },
+      "id": "79f5ac36-07b9-4a3d-ae5d-986a28f796da",
+      "name": "Filter: Applicants Count",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -23520,
+        12320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let supabaseRows=[];\ntry{supabaseRows=$('Get many rows').all();}catch(e){supabaseRows=[];}\nconst existingCompanyIds=new Set(supabaseRows.map(row=>String(row.json.company_uid||'').trim()).filter(id=>id&&id!=='undefined'&&id!=='null'));\nconst batchCompanyIds=new Map(), allItems=$input.all(), uniqueItems=[];\nallItems.forEach(item=>{const companyId=String(item.json.company_id||'').trim(); if(!companyId){console.log(`Skipped - missing company_id: ${item.json.company_name}`);return;} if(existingCompanyIds.has(companyId)){console.log(`Duplicate (Supabase): ${item.json.company_name}`);return;} if(batchCompanyIds.has(companyId)){console.log(`Duplicate (batch): ${item.json.company_name}`);return;} batchCompanyIds.set(companyId,{company:item.json.company_name,title:item.json.title}); uniqueItems.push(item);});\nconsole.log(`Deduplication: ${allItems.length} -> ${uniqueItems.length}`);\nreturn uniqueItems;"
+      },
+      "id": "7c9d0b8c-125a-4a3a-984b-901efde195dc",
+      "name": "Filter: Deduplication",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -23296,
+        12320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const MAX_EMPLOYEES=500, items=$input.all();\nconst filteredItems=items.filter(item=>{const range=item.json.employeeCountRange; if(range&&typeof range==='object'){if(range.end===null||range.end===undefined){console.log(`Excluded [10001+]: ${item.json.company_name}`);return false;} const passes=range.end<MAX_EMPLOYEES; if(!passes)console.log(`Excluded [range ${range.start}-${range.end}]: ${item.json.company_name}`); return passes;} if(typeof item.json.employeeCount==='number'&&item.json.employeeCount>0){const passes=item.json.employeeCount<MAX_EMPLOYEES; if(!passes)console.log(`Excluded [count ${item.json.employeeCount}]: ${item.json.company_name}`); return passes;} console.log(`No size data (kept): ${item.json.company_name}`); return true;});\nconsole.log(`Company size filter: ${items.length} -> ${filteredItems.length}`);\nreturn filteredItems;"
+      },
+      "id": "e36608f1-c20f-44f2-a541-be22974e304a",
+      "name": "Filter: Company Size",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -23072,
+        12320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const excludedIndustries=['staffing and recruiting','staffing','recruiting','human resources','hr services','it services','it consulting','software development','technology, information and internet','government administration','gambling','advertising services','education','non-profit organizations','non-profit organization management','non-profit','dairy','restaurants','hospitality','resorts','hotels','bars','pubs','breweries','wine and spirits','tourism','travel','leisure','sports','casinos','performing arts','music','photography','newspapers','museums','institutions','government relations','public policy','international affairs','non-profit organization','charity','foundations','fundraising','e-learning','universities','higher education','primary education','secondary education','professional training','coaching','computer security','network security','computer hardware','computer networking','management consulting','market research','executive search','investment banking','investment management','military','security and investigations','aviation','aerospace','airlines','defence','space','maritime','shipbuilding','mental healthcare','veterinary','individual and family services','luxury goods','jewelry','cosmetics','tobacco','executive office','writing','editing','event services','programme development','libraries'];\nconst items=$input.all();\nconst filteredItems=items.filter(item=>{const industriesArray=item.json.industries; if(Array.isArray(industriesArray)&&industriesArray.length>0){for(const ind of industriesArray){const val=typeof ind==='string'?ind.toLowerCase():[(ind.name||''),(ind.title||''),(ind.hierarchy||'')].join(' ').toLowerCase(); const isExcluded=excludedIndustries.some(term=>val.includes(term)); if(isExcluded){console.log(`Excluded: ${item.json.company_name} -> \"${val}\"`);return false;}} return true;} const industry=(item.json.company_industry||'').toLowerCase(); const isExcluded=excludedIndustries.some(term=>industry.includes(term)); if(isExcluded)console.log(`Excluded [fallback]: ${item.json.company_name} -> \"${industry}\"`); return!isExcluded;});\nconsole.log(`Industry filter: ${items.length} -> ${filteredItems.length}`);\nreturn filteredItems;"
+      },
+      "id": "6b3c519f-d7a7-45c5-8d5f-f7055cef0d11",
+      "name": "Filter: Industry Exclusion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -22848,
+        12320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items=$input.all(); if(items.length===0){console.log('[Guard] All items were filtered - nothing to process. Exiting cleanly.'); return [];} console.log(`[Guard] ${items.length} items passed all filters - proceeding to upsert.`); return items;"
+      },
+      "id": "657edc7f-afb2-4ac4-a33f-efdf984a6b9a",
+      "name": "Guard: Empty Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -22624,
+        12320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item=>{\n  const data=item.json;\n  const jobUrl=data.job_url||`https://www.linkedin.com/jobs/view/${data.job_id}`;\n  const companyUrl=data.company_profile||`https://www.linkedin.com/company/${data.company_id}`;\n  let industryStr=data.company_industry||''; if(!industryStr&&Array.isArray(data.industries)&&data.industries.length>0){const first=data.industries[0]; industryStr=typeof first==='string'?first:(first.name||first.title||'');}\n  const runMeta=$('Build Run Tag').first().json;\n  return{json:{'Job title':data.title,'Job ID':data.job_id,'job url':jobUrl,'location':data.location,'company name':data.company_name,'company ID':data.company_id,'company profile':companyUrl,'company website':data.company_website||null,'company domain':data.company_domain||null,'company size':data.company_size||null,'company location':data.company_locality||null,'industry':industryStr,'posted time':data.posted_datetime||null,'applicants':data.applicants_count||0,'base salary':data.base_salary||null,'seniority level':data.seniority_level||null,'employment type':data.employment_type||null,'job description':data.description_text||null,'apply url':data.apply_url||jobUrl,'recruiter_name':data.recruiter_name||null,'recruiter_details':data.recruiter_detail||null,'recruiter_profile':data.recruiter_profile||null,'hiring_team_count':data.hiring_team_count||0,'run_id':runMeta.run_id,'run_label':runMeta.run_label}};\n});"
+      },
+      "id": "c351db27-797a-4dcf-91d3-a30980daab64",
+      "name": "enrichment code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -22400,
+        12320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/companies",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { 'company_uid': Number($json['company ID']), 'company_name': $json['company name'], 'company_profile': $json['company profile'], 'company_linkedin_id': String($json['company ID']), 'company_size': $json['company size'], 'company_website': $json['company website'], 'company_locality': $json['company location'], 'company_industry': $json.industry, 'company_domain': $json['company domain'], 'industry_category': (() => { const ind = Array.isArray($('Filter: Industry Exclusion').item.json.industries) ? $('Filter: Industry Exclusion').item.json.industries[0] : null; return ind ? (typeof ind === 'string' ? ind : (ind.name ?? ind.localizedName ?? null)) : null; })(), 'run_id': $json['run_id'], 'run_label': $json['run_label'] } }}",
+        "options": {}
+      },
+      "id": "5bcb4676-b25c-4a9e-931c-04cf64ca344b",
+      "name": "Create a row1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -22176,
+        12320
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/rpc/log_pipeline_error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_workflow: 'Phase 1 — HarvestAPI Job Search', p_node_name: 'Create a row1', p_run_id: $('Build Run Tag').first().json.run_id, p_severity: 'WARNING', p_error_type: 'UNKNOWN', p_error_message: ($json.error?.message || $json.message || String($json.error || 'Unknown')).slice(0,500), p_item_data: { preview: JSON.stringify($json).slice(0, 800) }, p_phase: 'phase_1' } }}",
+        "options": {}
+      },
+      "id": "5eda9b5e-8418-4f06-9edd-4e2c1ccb5189",
+      "name": "Log Error — Create a row1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -21952,
+        12224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const enrichmentItems=$('enrichment code').all();\nreturn enrichmentItems.map(i=>({json:i.json}));"
+      },
+      "id": "64a9a29d-119b-40f2-b597-7d7538f6c320",
+      "name": "Restore Enrichment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -21952,
+        12416
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "376d58f9-40b3-4260-9ebb-c6ea70532a2e",
+              "leftValue": "={{ $json.recruiter_profile }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "5181ce96-9518-4498-9a4f-d15b4e8e5380",
+      "name": "If",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -21728,
+        12416
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/job_details_with_poster",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { 'job_id': Number($json['Job ID']), 'job_title': $json['Job title'], 'location': $json.location, 'posted_time': $json['posted time'], 'applicants': Number($json.applicants) || 0, 'base_salary': $json['base salary'], 'seniority_level': $json['seniority level'], 'employment_type': $json['employment type'], 'industry': $json.industry, 'job_description': $json['job description'], 'job_url': $json['job url'], 'apply_url': $json['apply url'], 'company_id': Number($json['company ID']), 'recruiter_name': $json.recruiter_name, 'recruiter_details': $json.recruiter_details, 'recruiter_profile': $json.recruiter_profile, 'run_id': $json['run_id'], 'run_label': $json['run_label'] } }}",
+        "options": {}
+      },
+      "id": "ae69a68c-1a3c-4ec2-8d1d-161c7289e9e7",
+      "name": "Create a row",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -21504,
+        12224
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item=>{const resp=item.json; const rows=Array.isArray(resp)?resp:[resp]; const row=rows.length>0?rows[0]:{}; return{json:row};});"
+      },
+      "id": "7bd5d035-671e-4343-87a8-638009730d71",
+      "name": "Unwrap Job Recruiter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -21280,
+        12128
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "items",
+        "options": {}
+      },
+      "id": "e313343c-5a8e-4a85-80df-2ef09d778885",
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -21056,
+        12128
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/rpc/mark_phase_completed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_run_id: $('Build Run Tag').first().json.run_id, p_phase: 'phase_1', p_record_count: $input.all().length } }}",
+        "options": {}
+      },
+      "id": "9a85ba0d-b082-41ad-b4ef-a1a75d2149c0",
+      "name": "Phase 1: Complete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -20832,
+        12128
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Aggregate').all();"
+      },
+      "id": "700e00f8-95d8-4871-8052-66a0584e003a",
+      "name": "Restore Phase 2A Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20624,
+        12128
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "a6DwzHauw_jgJFnoFr9P8",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/a6DwzHauw_jgJFnoFr9P8",
+          "cachedResultName": "Phase 2A — LinkedIn POC Scraper (Error Handled)"
+        },
+        "workflowInputs": {
+          "mappingMode": "passthrough",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "9be8ec6d-946f-4d30-973e-dc98c08780b7",
+      "name": "Call 'Phase 2 – LinkedIn POC Scraper'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -20400,
+        12128
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/rpc/log_pipeline_error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_workflow: 'Phase 1 — HarvestAPI Job Search', p_node_name: 'Create a row', p_run_id: $('Build Run Tag').first().json.run_id, p_severity: 'WARNING', p_error_type: 'UNKNOWN', p_error_message: ($json.error?.message || $json.message || String($json.error || 'Unknown')).slice(0,500), p_item_data: { preview: JSON.stringify($json).slice(0, 800) }, p_phase: 'phase_1' } }}",
+        "options": {}
+      },
+      "id": "16bbf0f0-392b-4014-8f78-99df39d0e830",
+      "name": "Log Error — Create a row",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -21280,
+        12320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/job_details",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { 'job_id': Number($json['Job ID']), 'job_title': $json['Job title'], 'location': $json.location, 'posted_time': $json['posted time'], 'applicants': Number($json.applicants) || 0, 'base_salary': $json['base salary'], 'seniority_level': $json['seniority level'], 'employment_type': $json['employment type'], 'industry': $json.industry, 'job_description': $json['job description'], 'job_url': $json['job url'], 'apply_url': $json['apply url'], 'company_id': Number($json['company ID']), 'run_id': $json['run_id'], 'run_label': $json['run_label'] } }}",
+        "options": {}
+      },
+      "id": "94c3a30f-e74d-42d7-a632-a297448f736b",
+      "name": "Create a row2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -21504,
+        12608
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item=>{const resp=item.json; const rows=Array.isArray(resp)?resp:[resp]; const row=rows.length>0?rows[0]:{}; return{json:row};});"
+      },
+      "id": "fe55c058-89b6-443a-b20c-64fc7dc9a386",
+      "name": "Unwrap Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -21280,
+        12512
+      ]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "items",
+        "options": {}
+      },
+      "id": "ea2efc3a-0230-4f35-9014-77aa98e9c758",
+      "name": "Aggregate job items",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -21056,
+        12512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/rpc/mark_phase_completed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_run_id: $('Build Run Tag').first().json.run_id, p_phase: 'phase_1', p_record_count: $input.all().length } }}",
+        "options": {}
+      },
+      "id": "0b63eec1-6401-4cd3-a38f-5fc339aba7eb",
+      "name": "Phase 1: Complete (2B)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -20832,
+        12512
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Aggregate job items').all();"
+      },
+      "id": "43f60513-1dbf-4ff2-aba7-8b70cf09dbbe",
+      "name": "Restore Phase 2B Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20624,
+        12512
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "VcaeFPTtJJu9ak7bud0gf",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/VcaeFPTtJJu9ak7bud0gf",
+          "cachedResultName": "Phase 2B — POC Lead Acquisition & Ranking (Error Handled)"
+        },
+        "workflowInputs": {
+          "mappingMode": "passthrough",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "b833178d-bf03-4930-b182-531e5da266b6",
+      "name": "Call 'Phase 2 – POC Lead Acquisition & Ranking'",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -20400,
+        12512
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/rpc/log_pipeline_error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_workflow: 'Phase 1 — HarvestAPI Job Search', p_node_name: 'Create a row2', p_run_id: $('Build Run Tag').first().json.run_id, p_severity: 'WARNING', p_error_type: 'UNKNOWN', p_error_message: ($json.error?.message || $json.message || String($json.error || 'Unknown')).slice(0,500), p_item_data: { preview: JSON.stringify($json).slice(0, 800) }, p_phase: 'phase_1' } }}",
+        "options": {}
+      },
+      "id": "946bdbfe-1d72-4b33-9c51-fdd8e23da61c",
+      "name": "Log Error — Create a row2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -21280,
+        12704
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/rpc/log_pipeline_error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_workflow: 'Phase 1 — HarvestAPI Job Search', p_node_name: 'Call \\'Phase 2 – LinkedIn POC S', p_run_id: $('Build Run Tag').first().json.run_id, p_severity: 'WARNING', p_error_type: 'SUBWORKFLOW_FAILURE', p_error_message: ($json.error?.message || $json.message || String($json.error || 'Unknown')).slice(0,500), p_item_data: { preview: JSON.stringify($json).slice(0, 800) }, p_phase: 'phase_1' } }}",
+        "options": {}
+      },
+      "id": "fb889892-5a7d-45d5-b38d-489272e2fee3",
+      "name": "Log Error — Call 'Phase 2 – LinkedIn POC S",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -26432,
+        11680
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/rpc/log_pipeline_error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { p_workflow: 'Phase 1 — HarvestAPI Job Search', p_node_name: 'Call \\'Phase 2 – POC Lead Acqui', p_run_id: $('Build Run Tag').first().json.run_id, p_severity: 'WARNING', p_error_type: 'SUBWORKFLOW_FAILURE', p_error_message: ($json.error?.message || $json.message || String($json.error || 'Unknown')).slice(0,500), p_item_data: { preview: JSON.stringify($json).slice(0, 800) }, p_phase: 'phase_1' } }}",
+        "options": {}
+      },
+      "id": "2aeab16a-3ace-4a51-b0b5-b668564ae108",
+      "name": "Log Error — Call 'Phase 2 – POC Lead Acqui",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -26432,
+        11904
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Search Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Search Params": {
+      "main": [
+        [
+          {
+            "node": "Count Today Runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count Today Runs": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "Build Actor Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Actor Input": {
+      "main": [
+        [
+          {
+            "node": "Run harvestapi/linkedin-job-search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run harvestapi/linkedin-job-search": {
+      "main": [
+        [
+          {
+            "node": "Extract Run Meta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Run harvestapi/linkedin-job-se",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Run Meta": {
+      "main": [
+        [
+          {
+            "node": "Build Run Tag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Run Tag": {
+      "main": [
+        [
+          {
+            "node": "Insert Run Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Run Record": {
+      "main": [
+        [
+          {
+            "node": "Phase 1: Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Insert Run Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 1: Start": {
+      "main": [
+        [
+          {
+            "node": "Get dataset items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get dataset items": {
+      "main": [
+        [
+          {
+            "node": "Parse & Extract Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Get dataset items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Extract Data": {
+      "main": [
+        [
+          {
+            "node": "Filter: Non English rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Non English rows": {
+      "main": [
+        [
+          {
+            "node": "Filter: Applicants Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Applicants Count": {
+      "main": [
+        [
+          {
+            "node": "Filter: Deduplication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Deduplication": {
+      "main": [
+        [
+          {
+            "node": "Filter: Company Size",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Company Size": {
+      "main": [
+        [
+          {
+            "node": "Filter: Industry Exclusion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter: Industry Exclusion": {
+      "main": [
+        [
+          {
+            "node": "Guard: Empty Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard: Empty Results": {
+      "main": [
+        [
+          {
+            "node": "enrichment code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "enrichment code": {
+      "main": [
+        [
+          {
+            "node": "Create a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row1": {
+      "main": [
+        [
+          {
+            "node": "Restore Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Create a row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Enrichment": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create a row2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row": {
+      "main": [
+        [
+          {
+            "node": "Unwrap Job Recruiter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unwrap Job Recruiter": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Phase 1: Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 1: Complete": {
+      "main": [
+        [
+          {
+            "node": "Restore Phase 2A Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Phase 2A Input": {
+      "main": [
+        [
+          {
+            "node": "Call 'Phase 2 – LinkedIn POC Scraper'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a row2": {
+      "main": [
+        [
+          {
+            "node": "Unwrap Job",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Error — Create a row2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unwrap Job": {
+      "main": [
+        [
+          {
+            "node": "Aggregate job items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate job items": {
+      "main": [
+        [
+          {
+            "node": "Phase 1: Complete (2B)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 1: Complete (2B)": {
+      "main": [
+        [
+          {
+            "node": "Restore Phase 2B Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Phase 2B Input": {
+      "main": [
+        [
+          {
+            "node": "Call 'Phase 2 – POC Lead Acquisition & Ranking'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "versionId": "c0f852af-b568-4e9c-9232-cb5657951169",
+  "meta": {
+    "aiBuilderAssisted": true,
+    "instanceId": "1ec8813f30fac48c9544a21b6fbcdbe1ca359e4b4109f04b0dfe5b5cfb3ecc5d"
+  },
+  "id": "0ajk8XKsWsOZSYLV",
+  "tags": []
+}
