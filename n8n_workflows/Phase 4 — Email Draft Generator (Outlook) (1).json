@@ -3,16 +3,34 @@
   "nodes": [
     {
       "parameters": {
+        "httpMethod": "POST",
+        "path": "email-draft-generator",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-2336, 592],
+      "id": "4a4d0ac9-6149-4a0f-84b1-6513ea8d5f7a",
+      "name": "Webhook",
+      "webhookId": "70d60f47-763e-4af5-a86f-e4efe2c1646b",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Webhook Shared Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
         "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst run_id = body.run_id;\nif (!run_id) throw new Error('run_id is required in the request body');\nreturn [{ json: { run_id } }];"
       },
-      "id": "6ed15bcf-018a-4ccf-a04c-59574e1e7f2c",
+      "id": "c25d7320-4026-46ac-8274-e0ac1df3bff5",
       "name": "Extract Run ID",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -2496,
-        -128
-      ]
+      "position": [-2000, 608]
     },
     {
       "parameters": {
@@ -20,65 +38,38 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            {
-              "name": "select",
-              "value": "ranked_poc_id,poc_id,first_name,full_name,job_title,selected_email,company_name,company_uid,lead_rank,run_id"
-            },
-            {
-              "name": "run_id",
-              "value": "={{ 'eq.' + $('Extract Run ID').first().json.run_id }}"
-            },
-            {
-              "name": "selected_email",
-              "value": "not.is.null"
-            },
-            {
-              "name": "order",
-              "value": "lead_rank.asc"
-            }
+            { "name": "select", "value": "ranked_poc_id,poc_id,first_name,full_name,job_title,selected_email,company_name,company_uid,lead_rank,run_id" },
+            { "name": "run_id", "value": "={{ 'eq.' + $('Extract Run ID').first().json.run_id }}" },
+            { "name": "selected_email", "value": "not.is.null" },
+            { "name": "order", "value": "lead_rank.asc" }
           ]
         },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }
           ]
         },
         "options": {}
       },
-      "id": "cfeb2468-9f86-4c80-863c-ab576d57b07e",
+      "id": "537ca636-81bb-4bcc-a118-fa1d95cd4763",
       "name": "Fetch Validated POCs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        -2288,
-        -128
-      ],
+      "position": [-1792, 608],
       "alwaysOutputData": true
     },
     {
       "parameters": {
         "jsCode": "const pocs = $input.all().map(i => i.json);\nif (!pocs.length) throw new Error('No POCs found for run_id: ' + $('Extract Run ID').first().json.run_id);\n\nconst pocIds       = [...new Set(pocs.map(p => p.poc_id).filter(Boolean))];\nconst companyUids  = [...new Set(pocs.map(p => p.company_uid).filter(Boolean))];\nconst run_id       = pocs[0]?.run_id || $('Extract Run ID').first().json.run_id;\n\nreturn [{ json: { pocIds, companyUids, run_id, pocCount: pocs.length } }];"
       },
-      "id": "3f3f4ad0-62d1-498c-8a84-d76c9c620f9c",
+      "id": "3f5992ab-9fc8-4bfd-b7b3-958073ccc7a6",
       "name": "Extract IDs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -2064,
-        -128
-      ]
+      "position": [-1568, 608]
     },
     {
       "parameters": {
@@ -86,47 +77,26 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            {
-              "name": "select",
-              "value": "poc_id,email_quality,email_result,subresult"
-            },
-            {
-              "name": "poc_id",
-              "value": "={{ 'in.(' + $('Extract IDs').first().json.pocIds.join(',') + ')' }}"
-            },
-            {
-              "name": "email_result",
-              "value": "eq.ok"
-            }
+            { "name": "select", "value": "poc_id,email_quality,email_result,subresult" },
+            { "name": "poc_id", "value": "={{ 'in.(' + $('Extract IDs').first().json.pocIds.join(',') + ')' }}" },
+            { "name": "email_result", "value": "eq.ok" }
           ]
         },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }
           ]
         },
         "options": {}
       },
-      "id": "e84641c1-053d-4c12-a7b1-5f750dc42558",
+      "id": "827921c9-e40a-485e-8bdb-4a642a4f98ad",
       "name": "Fetch Email Validations",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        -1840,
-        -128
-      ],
+      "position": [-1344, 608],
       "alwaysOutputData": true
     },
     {
@@ -135,47 +105,26 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            {
-              "name": "select",
-              "value": "job_title,location,company_id"
-            },
-            {
-              "name": "run_id",
-              "value": "={{ 'eq.' + $('Extract IDs').first().json.run_id }}"
-            },
-            {
-              "name": "company_id",
-              "value": "={{ 'in.(' + $('Extract IDs').first().json.companyUids.join(',') + ')' }}"
-            }
+            { "name": "select", "value": "job_title,location,company_id" },
+            { "name": "run_id", "value": "={{ 'eq.' + $('Extract IDs').first().json.run_id }}" },
+            { "name": "company_id", "value": "={{ 'in.(' + $('Extract IDs').first().json.companyUids.join(',') + ')' }}" }
           ]
         },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }
           ]
         },
         "options": {}
       },
-      "id": "4549dc7b-ea44-4f9d-ab13-16c846a03ca3",
+      "id": "e549e256-1932-49b9-b86d-a0794848af44",
       "name": "Fetch Job Details",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        -1616,
-        -128
-      ],
+      "position": [-1120, 608],
       "alwaysOutputData": true
     },
     {
@@ -184,43 +133,25 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            {
-              "name": "select",
-              "value": "company_uid,company_locality"
-            },
-            {
-              "name": "company_uid",
-              "value": "={{ 'in.(' + $('Extract IDs').first().json.companyUids.join(',') + ')' }}"
-            }
+            { "name": "select", "value": "company_uid,company_locality" },
+            { "name": "company_uid", "value": "={{ 'in.(' + $('Extract IDs').first().json.companyUids.join(',') + ')' }}" }
           ]
         },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }
           ]
         },
         "options": {}
       },
-      "id": "9b26412f-12b4-4bf0-badc-9a32c2931a71",
+      "id": "3e318eef-39f4-48db-9f61-e5c23043d034",
       "name": "Fetch Company Localities",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        -1408,
-        -128
-      ],
+      "position": [-912, 608],
       "alwaysOutputData": true
     },
     {
@@ -229,461 +160,221 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            {
-              "name": "select",
-              "value": "template_id,name,subject,body"
-            },
-            {
-              "name": "is_active",
-              "value": "eq.true"
-            },
-            {
-              "name": "order",
-              "value": "sort_order.asc"
-            }
+            { "name": "select", "value": "template_id,name,subject,body" },
+            { "name": "is_active", "value": "eq.true" },
+            { "name": "order", "value": "sort_order.asc" }
           ]
         },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }
           ]
         },
         "options": {}
       },
-      "id": "41e4a902-ac74-4034-ae48-5b0c33c5f658",
+      "id": "6e2ba94e-48bb-4ed1-be2f-818f43da0a67",
       "name": "Fetch Active Templates",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        -1184,
-        -128
-      ],
+      "position": [-688, 608],
       "alwaysOutputData": true
     },
     {
-      "parameters": {
-        "jsCode": "// Gather all upstream data\nconst pocs       = $('Fetch Validated POCs').all().map(i => i.json);\nconst validations = $('Fetch Email Validations').all().map(i => i.json);\nconst jobs        = $('Fetch Job Details').all().map(i => i.json);\nconst localities  = $('Fetch Company Localities').all().map(i => i.json);\nconst run_id      = $('Extract IDs').first().json.run_id;\n\n// Build lookup maps\nconst validMap = {};\nfor (const v of validations) validMap[v.poc_id] = v;\n\nconst jobMap = {};\nfor (const j of jobs) {\n  if (!jobMap[j.company_id]) jobMap[j.company_id] = j;\n}\n\nconst localMap = {};\nfor (const l of localities) localMap[l.company_uid] = l.company_locality || '';\n\n// Build one item per POC with valid email\nconst queue = [];\nfor (const poc of pocs) {\n  const validation = validMap[poc.poc_id];\n  if (!validation) continue;\n  if (!poc.selected_email) continue;\n\n  const job      = jobMap[poc.company_uid] || {};\n  const location = localMap[poc.company_uid] || '';\n  const firstName = poc.first_name\n    || (poc.full_name || '').split(' ')[0]\n    || 'there';\n\n  queue.push({ json: {\n    ranked_poc_id:    poc.ranked_poc_id,\n    poc_id:           poc.poc_id,\n    first_name:       firstName,\n    full_name:        poc.full_name || poc.first_name || '',\n    poc_title:        poc.job_title || '',\n    to_email:         poc.selected_email,\n    company_name:     poc.company_name || '',\n    company_uid:      poc.company_uid,\n    hiring_job_title: job.job_title || '',\n    job_location:     location,\n    run_id,\n    email_quality:    validation.email_quality || '',\n  }});\n}\n\nif (queue.length === 0) {\n  throw new Error('No POCs with validated emails (email_result=ok) found for this run.');\n}\n\nreturn queue;"
-      },
-      "id": "a11ab281-83b6-43af-8410-6bb958fd9059",
+      "parameters": { "jsCode": "const MAX_DRAFTS_PER_COMPANY = 3;\n\nconst pocs = $input.all().map(i => i.json);\nif (!pocs.length) throw new Error('No POCs found for run_id: ' + $('Extract Run ID').first().json.run_id);\n\nconst validations = $('Fetch Email Validations').all().map(i => i.json);\nconst jobs        = $('Fetch Job Details').all().map(i => i.json);\nconst localities  = $('Fetch Company Localities').all().map(i => i.json);\nconst run_id      = $('Extract IDs').first().json.run_id;\n\nconst validMap = {};\nfor (const v of validations) validMap[v.poc_id] = v;\n\nconst jobMap = {};\nfor (const j of jobs) { if (!jobMap[j.company_id]) jobMap[j.company_id] = j; }\n\nconst localMap = {};\nfor (const l of localities) localMap[l.company_uid] = l.company_locality || '';\n\nconst companyCounts = {};\nconst queue = [];\n\nfor (const poc of pocs) {\n  const validation = validMap[poc.poc_id];\n  if (!validation) continue;\n  if (!poc.selected_email) continue;\n\n  const uid = poc.company_uid || 'unknown';\n  companyCounts[uid] = (companyCounts[uid] || 0) + 1;\n  if (companyCounts[uid] > MAX_DRAFTS_PER_COMPANY) continue;\n\n  const job      = jobMap[poc.company_uid] || {};\n  const location = localMap[poc.company_uid] || '';\n  const firstName = poc.first_name || (poc.full_name || '').split(' ')[0] || 'there';\n\n  queue.push({ json: { ranked_poc_id: poc.ranked_poc_id, poc_id: poc.poc_id, first_name: firstName, full_name: poc.full_name || poc.first_name || '', poc_title: poc.job_title || '', to_email: poc.selected_email, company_name: poc.company_name || '', company_uid: poc.company_uid, hiring_job_title: job.job_title || '', job_location: location, run_id, email_quality: validation.email_quality || '' }});\n}\n\nif (queue.length === 0) throw new Error('No POCs with validated emails (email_result=ok) found for this run.');\nreturn queue;" },
+      "id": "e5f5ad5b-3006-450c-b857-126963292da4",
       "name": "Build Draft Queue",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -960,
-        -128
-      ]
+      "position": [-464, 608]
     },
     {
       "parameters": {
-        "options": {}
-      },
-      "id": "761fd393-49cd-47d2-af8f-8b74d03676b5",
-      "name": "Split in Batches",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        -720,
-        -352
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const poc = $input.first().json;\n\n// Get active templates from upstream node\nconst templates = $('Fetch Active Templates').all().map(i => i.json)\n  .filter(t => t.body && t.subject);\n\nif (!templates.length) throw new Error('No active email templates found in database.');\n\n// Pick a random template\nconst template = templates[Math.floor(Math.random() * templates.length)];\n\n// Simple variable substitution\nfunction render(str) {\n  return (str || '')\n    .replace(/\\{first_name\\}/g, poc.first_name || 'there')\n    .replace(/\\{job_title\\}/g,  poc.hiring_job_title || '')\n    .replace(/\\{location\\}/g,   poc.job_location || '');\n}\n\nconst rendered_subject = render(template.subject);\nconst rendered_body    = render(template.body);\n\nreturn [{ json: {\n  ...poc,\n  rendered_subject,\n  rendered_body,\n  template_id:   template.template_id,\n  template_name: template.name,\n}}];"
-      },
-      "id": "ab17c57b-bdfe-4c0c-bfe0-ae4770008832",
-      "name": "Render Email",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -480,
-        -240
-      ],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "resource": "draft",
-        "subject": "={{ $json.rendered_subject }}",
-        "message": "={{ $json.rendered_body }}",
-        "options": {}
-      },
-      "id": "c7602e24-5f89-45ba-a0e6-37164a4ae486",
-      "name": "Create Gmail Draft",
-      "type": "n8n-nodes-base.gmail",
-      "typeVersion": 2.1,
-      "position": [
-        -32,
-        -240
-      ],
-      "webhookId": "bf72fad9-7fa8-438d-85c7-d23a77f67b7b",
-      "credentials": {
-        "gmailOAuth2": {
-          "id": "LPpTN0MhoD7669RL",
-          "name": "Gmail account"
-        }
-      },
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "jsCode": "// Get the POC data from Render Email node\nconst poc = $('Render Email').first().json;\n\n// Get Gmail result (may have error if Gmail failed)\nconst gmailResult = $input.first().json;\nconst gmailError  = gmailResult.error;\n\n// Gmail draft ID is in gmailResult.id\nconst gmailDraftId = gmailResult.id || null;\nconst status = gmailError ? 'failed' : 'draft';\n\nreturn [{ json: {\n  run_id:           poc.run_id,\n  ranked_poc_id:    poc.ranked_poc_id,\n  poc_id:           poc.poc_id,\n  to_email:         poc.to_email,\n  to_name:          poc.full_name,\n  company_name:     poc.company_name,\n  hiring_job_title: poc.hiring_job_title,\n  poc_title:        poc.poc_title,\n  job_location:     poc.job_location,\n  subject:          poc.rendered_subject,\n  body:             poc.rendered_body,\n  template_id:      poc.template_id,\n  template_name:    poc.template_name,\n  status,\n  gmail_draft_id:   gmailDraftId,\n}}];"
-      },
-      "id": "a745c828-082c-4c92-934d-138ee634f7fd",
-      "name": "Save Draft Record",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        208,
-        -240
-      ],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "method": "POST",
         "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/email_drafts",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            },
-            {
-              "name": "Prefer",
-              "value": "resolution=merge-duplicates,return=representation"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { 'run_id': $json.run_id, 'ranked_poc_id': $json.ranked_poc_id, 'poc_id': $json.poc_id, 'to_email': $json.to_email, 'to_name': $json.to_name, 'company_name': $json.company_name, 'hiring_job_title': $json.hiring_job_title, 'poc_title': $json.poc_title, 'job_location': $json.job_location, 'subject': $json.subject, 'body': $json.body, 'template_id': $json.template_id, 'template_name': $json.template_name, 'status': $json.status, 'outlook_draft_id': $json.gmail_draft_id } }}",
-        "options": {}
-      },
-      "id": "3a3dc698-5b0e-455d-b259-2079c7b70bb9",
-      "name": "Insert Draft to Supabase",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        448,
-        -240
-      ],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "jsCode": "return $input.all();"
-      },
-      "id": "27a30712-dae9-4642-b7ec-65a653a840c6",
-      "name": "Loop Safeguard",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        688,
-        -240
-      ],
-      "continueOnFail": true
-    },
-    {
-      "parameters": {
-        "method": "PATCH",
-        "url": "=https://sgnxqspceytihmoynclg.supabase.co/rest/v1/runs",
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            {
-              "name": "run_id",
-              "value": "={{ 'eq.' + $('Extract IDs').first().json.run_id }}"
-            }
+            { "name": "select", "value": "company_uid,template_id,created_at" },
+            { "name": "order", "value": "created_at.desc" },
+            { "name": "limit", "value": "300" }
           ]
         },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            },
-            {
-              "name": "apikey",
-              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            },
-            {
-              "name": "Authorization",
-              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk"
-            },
-            {
-              "name": "Prefer",
-              "value": "return=representation"
-            }
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { \"pipeline_status\": \"emails_drafted\", \"run_summary\": \"Email drafts created in Outlook for \" + $(\"Build Draft Queue\").all().length + \" contacts.\" } }}",
         "options": {}
       },
-      "id": "473aee5d-e47b-4afa-bcb9-bf8a4d0f5213",
-      "name": "Update Run Status",
+      "id": "b7ac79db-b32b-4266-b7e4-e0bf80fc628f",
+      "name": "Fetch Recent Template History",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        -480,
-        48
-      ],
+      "position": [-224, 608],
+      "alwaysOutputData": true,
       "continueOnFail": true
     },
     {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { \"success\": true, \"message\": \"Email drafts queued for run: \" + $(\"Extract IDs\").first().json.run_id, \"drafts_queued\": $(\"Build Draft Queue\").all().length } }}",
-        "options": {
-          "responseCode": 200
-        }
-      },
-      "id": "2e2c85da-a6d7-4483-a6a7-e44eece10343",
+      "parameters": { "jsCode": "const queue     = $('Build Draft Queue').all().map(i => i.json);\nconst templates = $('Fetch Active Templates').all().map(i => i.json).filter(t => t.body && t.subject);\nif (!templates.length) throw new Error('No active email templates found in database.');\nconst history = $('Fetch Recent Template History').all().map(i => i.json);\nconst lastUsedByCompany = {};\nfor (const h of history) { if (h.company_uid && !lastUsedByCompany[h.company_uid]) lastUsedByCompany[h.company_uid] = h.template_id; }\nfunction shuffle(arr) { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }\nconst pool = shuffle(templates);\nlet poolIndex = 0;\nconst lastUsedThisRun = {};\nfunction pickTemplate(companyUid) { const avoid = new Set([lastUsedByCompany[companyUid], lastUsedThisRun[companyUid]].filter(Boolean)); for (let attempts = 0; attempts < templates.length; attempts++) { const candidate = pool[poolIndex % pool.length]; poolIndex++; if (templates.length === 1 || !avoid.has(candidate.template_id)) { lastUsedThisRun[companyUid] = candidate.template_id; return candidate; } } const fallback = pool[poolIndex % pool.length]; poolIndex++; lastUsedThisRun[companyUid] = fallback.template_id; return fallback; }\nconst ACTIVE_PROVIDERS = ['gmail'];\nreturn queue.map((item, idx) => { const template = pickTemplate(item.company_uid); return { json: { ...item, template_id: template.template_id, template_name: template.name, template_subject: template.subject, template_body: template.body, send_provider: ACTIVE_PROVIDERS[idx % ACTIVE_PROVIDERS.length] }}; });" },
+      "id": "f3f12c7b-2ece-4fc6-8778-81a6d6304f2f",
+      "name": "Assign Templates & Provider (Anti-Spam Rotation)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [16, 608]
+    },
+    {
+      "parameters": { "options": {} },
+      "id": "74c70d7b-7802-4b41-b1d7-d6c1cf568ecd",
+      "name": "Split in Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [256, 384]
+    },
+    {
+      "parameters": { "jsCode": "const poc = $input.first().json;\nfunction render(str) { return (str || '').replace(/\\{first_name\\}/g, poc.first_name || 'there').replace(/\\{full_name\\}/g, poc.full_name || poc.first_name || 'there').replace(/\\{company_name\\}/g, poc.company_name || 'your company').replace(/\\{job_title\\}/g, poc.hiring_job_title || '').replace(/\\{poc_title\\}/g, poc.poc_title || '').replace(/\\{location\\}/g, poc.job_location || ''); }\nreturn [{ json: { ...poc, rendered_subject: render(poc.template_subject), rendered_body: render(poc.template_body) }}];" },
+      "id": "c94d4e8e-cf8a-4e2f-9f71-16794a870c9f",
+      "name": "Render Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [16, 496],
+      "continueOnFail": true
+    },
+    {
+      "parameters": { "resume": "timeInterval", "unit": "seconds", "amount": "={{ Math.floor(Math.random() * 6) + 3 }}" },
+      "id": "1655eaa7-33ed-40ec-93fc-f9a87e3b85c7",
+      "name": "Pace Draft Creation",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [256, 496]
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "5be22a3d-fd6b-4cba-b70e-20cba9dd1672", "leftValue": "={{ $json.send_provider }}", "rightValue": "outlook", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }, "options": {} },
+      "id": "9ccd0458-e3f2-4306-a888-0c1b59ae28fb",
+      "name": "Route by Provider",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [496, 496]
+    },
+    {
+      "parameters": { "resource": "draft", "operation": "create", "subject": "={{ $json.rendered_subject }}", "bodyContent": "={{ $json.rendered_body }}", "additionalFields": { "toRecipients": "={{ $json.to_email }}" } },
+      "id": "5e44694d-fc77-4db9-a3e8-c58997302aa8",
+      "name": "Create Outlook Draft",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [736, 400],
+      "credentials": { "microsoftOutlookOAuth2Api": { "id": "REPLACE_WITH_YOUR_OUTLOOK_CREDENTIAL_ID", "name": "Outlook account" } },
+      "continueOnFail": true,
+      "disabled": true
+    },
+    {
+      "parameters": { "resource": "draft", "operation": "create", "subject": "={{ $json.rendered_subject }}", "message": "={{ $json.rendered_body }}", "options": { "sendTo": "={{ $json.to_email }}" } },
+      "id": "479beccb-9360-4069-ac20-18c36b93c5b1",
+      "name": "Create Gmail Draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [736, 600],
+      "credentials": { "gmailOAuth2": { "id": "REPLACE_WITH_YOUR_GMAIL_CREDENTIAL_ID", "name": "Gmail account" } },
+      "continueOnFail": true
+    },
+    {
+      "parameters": { "jsCode": "const poc = $('Render Email').first().json;\nconst draftResult = $input.first().json;\nconst draftError  = draftResult.error;\nconst draftId = draftResult.id || null;\nconst status  = draftError ? 'failed' : 'draft';\nreturn [{ json: { run_id: poc.run_id, ranked_poc_id: poc.ranked_poc_id, poc_id: poc.poc_id, to_email: poc.to_email, to_name: poc.full_name, company_name: poc.company_name, hiring_job_title: poc.hiring_job_title, poc_title: poc.poc_title, job_location: poc.job_location, subject: poc.rendered_subject, body: poc.rendered_body, template_id: poc.template_id, template_name: poc.template_name, status, provider: poc.send_provider, draft_id: draftId, outlook_draft_id: poc.send_provider === 'outlook' ? draftId : null }}];" },
+      "id": "2e9e75ac-aa59-4b2c-aa03-4b3a704b7646",
+      "name": "Save Draft Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [976, 496],
+      "continueOnFail": true
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://sgnxqspceytihmoynclg.supabase.co/rest/v1/email_drafts", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }, { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }, { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }, { "name": "Prefer", "value": "resolution=merge-duplicates,return=representation" }] }, "sendBody": true, "specifyBody": "json", "jsonBody": "={{ { 'run_id': $json.run_id, 'ranked_poc_id': $json.ranked_poc_id, 'poc_id': $json.poc_id, 'to_email': $json.to_email, 'to_name': $json.to_name, 'company_name': $json.company_name, 'hiring_job_title': $json.hiring_job_title, 'poc_title': $json.poc_title, 'job_location': $json.job_location, 'subject': $json.subject, 'body': $json.body, 'template_id': $json.template_id, 'template_name': $json.template_name, 'status': $json.status, 'provider': $json.provider, 'draft_id': $json.draft_id, 'outlook_draft_id': $json.outlook_draft_id } }}", "options": {} },
+      "id": "1ea3a382-5dc8-496c-9d1e-3e6d0f2994b4",
+      "name": "Insert Draft to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1216, 496],
+      "continueOnFail": true
+    },
+    {
+      "parameters": { "jsCode": "const staticData = $getWorkflowStaticData('node');\nstaticData.iterations = (staticData.iterations || 0) + 1;\nconst queued = $('Build Draft Queue').all().length;\nconst HARD_CAP = queued + 10;\nif (staticData.iterations > HARD_CAP) throw new Error(`Loop Safeguard triggered: ${staticData.iterations} iterations exceeds expected ${queued} queued drafts. Aborting.`);\nreturn $input.all();" },
+      "id": "2c44a25f-8bd5-43d3-937d-a6cee99e954e",
+      "name": "Loop Safeguard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1456, 496],
+      "continueOnFail": true
+    },
+    {
+      "parameters": { "url": "=https://sgnxqspceytihmoynclg.supabase.co/rest/v1/email_drafts", "sendQuery": true, "queryParameters": { "parameters": [{ "name": "select", "value": "status,provider" }, { "name": "run_id", "value": "={{ 'eq.' + $('Extract IDs').first().json.run_id }}" }] }, "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }, { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }, { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }] }, "options": {} },
+      "id": "becf190b-03ac-4389-8c3e-c9b287f14ab1",
+      "name": "Fetch Run Draft Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [16, 784],
+      "alwaysOutputData": true,
+      "continueOnFail": true
+    },
+    {
+      "parameters": { "jsCode": "const rows = $input.all().map(i => i.json);\nconst succeeded    = rows.filter(r => r.status === 'draft').length;\nconst failed       = rows.filter(r => r.status === 'failed').length;\nconst total        = rows.length;\nconst gmailCount   = rows.filter(r => r.provider === 'gmail').length;\nconst outlookCount = rows.filter(r => r.provider === 'outlook').length;\nreturn [{ json: { run_id: $('Extract IDs').first().json.run_id, total_drafts_attempted: total, drafts_succeeded: succeeded, drafts_failed: failed, gmail_drafts: gmailCount, outlook_drafts: outlookCount }}];" },
+      "id": "41c2c919-a297-44f8-8e6a-a04202421dc9",
+      "name": "Summarize Draft Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [256, 784]
+    },
+    {
+      "parameters": { "method": "PATCH", "url": "=https://sgnxqspceytihmoynclg.supabase.co/rest/v1/runs", "sendQuery": true, "queryParameters": { "parameters": [{ "name": "run_id", "value": "={{ 'eq.' + $('Extract IDs').first().json.run_id }}" }] }, "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }, { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }, { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnbnhxc3BjZXl0aWhtb3luY2xnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjY4OTkzNywiZXhwIjoyMDg4MjY1OTM3fQ.UgzVf7onAeHK4LFkY06sYYW3Zu3eZofMBq10qkaoaXk" }, { "name": "Prefer", "value": "return=representation" }] }, "sendBody": true, "specifyBody": "json", "jsonBody": "={{ { \"pipeline_status\": $json.drafts_failed > 0 ? \"emails_drafted_with_errors\" : \"emails_drafted\", \"run_summary\": \"Drafted \" + $json.drafts_succeeded + \" of \" + $json.total_drafts_attempted + \" email(s) — \" + $json.gmail_drafts + \" via Gmail, \" + $json.outlook_drafts + \" via Outlook (\" + $json.drafts_failed + \" failed).\" } }}", "options": {} },
+      "id": "d16eaf70-f7ab-4ca7-adaa-b1c889545256",
+      "name": "Update Run Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [496, 784],
+      "continueOnFail": true
+    },
+    {
+      "parameters": { "respondWith": "json", "responseBody": "={{ { \"success\": $json.drafts_failed === 0, \"message\": \"Email drafts created for run: \" + $json.run_id, \"drafts_succeeded\": $json.drafts_succeeded, \"drafts_failed\": $json.drafts_failed, \"drafts_attempted\": $json.total_drafts_attempted, \"gmail_drafts\": $json.gmail_drafts, \"outlook_drafts\": $json.outlook_drafts } }}", "options": { "responseCode": 200 } },
+      "id": "8e648a16-8e81-464d-b1c7-1678ab939cf4",
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [
-        -32,
-        48
-      ]
-    },
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "email-draft-generator",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2.1,
-      "position": [
-        -2832,
-        -144
-      ],
-      "id": "af56cf28-d13e-4afa-95cf-889463c0cfbe",
-      "name": "Webhook",
-      "webhookId": "70d60f47-763e-4af5-a86f-e4efe2c1646b"
+      "position": [736, 784]
     }
   ],
   "pinData": {},
   "connections": {
-    "Extract Run ID": {
-      "main": [
-        [
-          {
-            "node": "Fetch Validated POCs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Validated POCs": {
-      "main": [
-        [
-          {
-            "node": "Extract IDs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract IDs": {
-      "main": [
-        [
-          {
-            "node": "Fetch Email Validations",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Email Validations": {
-      "main": [
-        [
-          {
-            "node": "Fetch Job Details",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Job Details": {
-      "main": [
-        [
-          {
-            "node": "Fetch Company Localities",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Company Localities": {
-      "main": [
-        [
-          {
-            "node": "Fetch Active Templates",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Active Templates": {
-      "main": [
-        [
-          {
-            "node": "Build Draft Queue",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build Draft Queue": {
-      "main": [
-        [
-          {
-            "node": "Split in Batches",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Split in Batches": {
-      "main": [
-        [
-          {
-            "node": "Update Run Status",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Render Email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Render Email": {
-      "main": [
-        [
-          {
-            "node": "Create Gmail Draft",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Save Draft Record": {
-      "main": [
-        [
-          {
-            "node": "Insert Draft to Supabase",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Insert Draft to Supabase": {
-      "main": [
-        [
-          {
-            "node": "Loop Safeguard",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Loop Safeguard": {
-      "main": [
-        [
-          {
-            "node": "Split in Batches",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Update Run Status": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Create Gmail Draft": {
-      "main": [
-        [
-          {
-            "node": "Save Draft Record",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Webhook": {
-      "main": [
-        [
-          {
-            "node": "Extract Run ID",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+    "Webhook": { "main": [[{ "node": "Extract Run ID", "type": "main", "index": 0 }]] },
+    "Extract Run ID": { "main": [[{ "node": "Fetch Validated POCs", "type": "main", "index": 0 }]] },
+    "Fetch Validated POCs": { "main": [[{ "node": "Extract IDs", "type": "main", "index": 0 }]] },
+    "Extract IDs": { "main": [[{ "node": "Fetch Email Validations", "type": "main", "index": 0 }]] },
+    "Fetch Email Validations": { "main": [[{ "node": "Fetch Job Details", "type": "main", "index": 0 }]] },
+    "Fetch Job Details": { "main": [[{ "node": "Fetch Company Localities", "type": "main", "index": 0 }]] },
+    "Fetch Company Localities": { "main": [[{ "node": "Fetch Active Templates", "type": "main", "index": 0 }]] },
+    "Fetch Active Templates": { "main": [[{ "node": "Build Draft Queue", "type": "main", "index": 0 }]] },
+    "Build Draft Queue": { "main": [[{ "node": "Fetch Recent Template History", "type": "main", "index": 0 }]] },
+    "Fetch Recent Template History": { "main": [[{ "node": "Assign Templates & Provider (Anti-Spam Rotation)", "type": "main", "index": 0 }]] },
+    "Assign Templates & Provider (Anti-Spam Rotation)": { "main": [[{ "node": "Split in Batches", "type": "main", "index": 0 }]] },
+    "Split in Batches": { "main": [[{ "node": "Fetch Run Draft Results", "type": "main", "index": 0 }], [{ "node": "Render Email", "type": "main", "index": 0 }]] },
+    "Render Email": { "main": [[{ "node": "Pace Draft Creation", "type": "main", "index": 0 }]] },
+    "Pace Draft Creation": { "main": [[{ "node": "Route by Provider", "type": "main", "index": 0 }]] },
+    "Route by Provider": { "main": [[{ "node": "Create Outlook Draft", "type": "main", "index": 0 }], [{ "node": "Create Gmail Draft", "type": "main", "index": 0 }]] },
+    "Create Outlook Draft": { "main": [[{ "node": "Save Draft Record", "type": "main", "index": 0 }]] },
+    "Create Gmail Draft": { "main": [[{ "node": "Save Draft Record", "type": "main", "index": 0 }]] },
+    "Save Draft Record": { "main": [[{ "node": "Insert Draft to Supabase", "type": "main", "index": 0 }]] },
+    "Insert Draft to Supabase": { "main": [[{ "node": "Loop Safeguard", "type": "main", "index": 0 }]] },
+    "Loop Safeguard": { "main": [[{ "node": "Split in Batches", "type": "main", "index": 0 }]] },
+    "Fetch Run Draft Results": { "main": [[{ "node": "Summarize Draft Results", "type": "main", "index": 0 }]] },
+    "Summarize Draft Results": { "main": [[{ "node": "Update Run Status", "type": "main", "index": 0 }]] },
+    "Update Run Status": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
   },
-  "active": true,
-  "settings": {
-    "executionOrder": "v1",
-    "binaryMode": "separate"
-  },
-  "versionId": "72cb4abe-3270-40fe-8f97-a819f8db1df1",
-  "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "1ec8813f30fac48c9544a21b6fbcdbe1ca359e4b4109f04b0dfe5b5cfb3ecc5d"
-  },
-  "id": "fN4Tn096EKXW5cGl",
+  "active": false,
+  "settings": { "executionOrder": "v1", "binaryMode": "separate", "availableInMCP": true },
+  "versionId": "36fbb9fc-20b0-415d-8306-df2932ed034f",
+  "meta": { "instanceId": "14df47cf0e2a9723c8b98095882821deea6c30743f698cf6f55f6f97989c68ab" },
+  "nodeGroups": [],
+  "id": "sgkDh6qS9nfylSgM",
   "tags": []
 }

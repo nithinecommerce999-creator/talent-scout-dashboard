@@ -151,27 +151,40 @@ There are 6 n8n workflows. Here is what each one does and how they connect.
 ---
 
 ### Phase 4 — Email Draft Generator
-**Trigger:** HTTP POST webhook  
+**Trigger:** HTTP POST webhook (header-auth secured)  
 **Webhook path:** `/webhook/email-draft-generator`  
 **Triggered by:** Dashboard "Generate Email Drafts" button on Run Details page  
-**Note:** This is optional — not part of the automatic pipeline
+**Note:** This is optional — not part of the automatic pipeline. Drafts only, never sends.
 
 **What it does:**
 1. Receives a `run_id`
-2. Fetches all ranked POCs for that run that have `selected_email` set
+2. Fetches all ranked POCs for that run with a `selected_email`
 3. Filters to only POCs with `email_result = ok` (validated emails only)
-4. Fetches active email templates from `email_templates` table in Supabase
-5. For each POC, picks a random active template and renders variables:
+4. **Caps at 3 contacts per company** — prevents bursting near-identical emails at one company which triggers spam filters
+5. Fetches active email templates from the `email_templates` Supabase table
+6. Fetches last 300 draft records to know which template each company received most recently
+7. **Anti-spam template rotation** — shuffles templates and avoids repeating the same template for a company across runs. Never assigns the same template twice in a row to the same company
+8. Renders personalised variables per contact:
    - `{first_name}` → POC's first name
-   - `{job_title}` → the job title that was being hired for
+   - `{full_name}` → POC's full name
+   - `{company_name}` → company name
+   - `{job_title}` → the role being hired for
+   - `{poc_title}` → the contact's own job title
    - `{location}` → company location
-6. Creates a **Gmail draft** for each contact via Gmail OAuth2
-7. Saves the draft record (subject, body, gmail_draft_id, status) to `email_drafts` table
-8. Updates run status to `emails_drafted`
+9. **Paces draft creation** — waits 3–8 seconds randomly between each draft to stay under provider limits
+10. **Routes by provider** — currently Gmail-only; Outlook node exists but is disabled until credential is connected. Change `ACTIVE_PROVIDERS = ['gmail']` to `['gmail','outlook']` to enable 50/50 split
+11. Creates a **Gmail draft** (or Outlook draft when enabled) for each contact
+12. Saves every draft's status, provider, and mailbox draft ID to `email_drafts` table
+13. **Loop safeguard** — aborts if iteration count exceeds queue size + 10, preventing runaway loops
+14. Reports final summary: total attempted, succeeded, failed, Gmail/Outlook split
+15. Updates run status to `emails_drafted` or `emails_drafted_with_errors`
 
 **Data saved to:** `email_drafts`, updates `runs.pipeline_status`
 
-**Requirement:** Gmail OAuth2 credentials must be configured in n8n. If the Gmail node fails, the draft is still saved to Supabase with `status = failed`.
+**Requirements:**
+- Gmail OAuth2 credential must be connected in n8n (`Gmail account`)
+- At least one active template in `email_templates` with `is_active = true`
+- Webhook is header-auth secured — the dashboard sends the correct shared secret header automatically
 
 ---
 
@@ -278,21 +291,32 @@ Phase 4 is triggered manually from the Run Details page after a run completes.
 **Requirements before generating drafts:**
 - The run must be completed (green status)
 - At least some POC leads must have validated emails (`email_result = ok`)
-- Active email templates must exist in the `email_templates` Supabase table
+- Active email templates must exist in the `email_templates` Supabase table with `is_active = true`
 - Gmail OAuth2 credentials must be connected in n8n
 
 **Steps:**
 1. Go to **Runs** → click **View** on a completed run
-2. Click the **POC Leads** tab — confirm there are verified (green) email badges
+2. Click the **POC Leads** tab — confirm there are Verified (green) or Acceptable (yellow) email badges
 3. Click **"Generate Email Drafts"** button
-4. Wait ~15 seconds — the workflow runs and the drafts section will populate
+4. Wait ~15–30 seconds — the workflow runs and the drafts section will populate
 5. Each draft appears with subject, body, recipient name, and status
 
-**Draft statuses:**
-- `draft` — Gmail draft created successfully
-- `failed` — Gmail node errored (draft saved to DB but not in Gmail)
+**What the workflow does per contact:**
+- Caps at **3 drafts per company** per run (anti-spam)
+- Picks a template using **shuffle rotation** — avoids repeating the same template a company received last time
+- Fills in personalised placeholders: name, company, hiring role, location
+- Waits **3–8 seconds** between each draft (pacing)
+- Currently uses **Gmail only** — Outlook is prepared but disabled until credentials are set up
 
-**Note:** If you don't see the "Generate Email Drafts" button, it means no POC leads have `email_result = ok` for that run.
+**Draft statuses:**
+- `draft` — created successfully in Gmail (or Outlook)
+- `failed` — provider node errored; draft still saved to Supabase for reference
+
+**Run status after completion:**
+- `emails_drafted` — all drafts succeeded
+- `emails_drafted_with_errors` — some failed
+
+**Note:** The "Generate Email Drafts" button only appears when at least one POC lead has `email_result = ok`.
 
 ---
 
