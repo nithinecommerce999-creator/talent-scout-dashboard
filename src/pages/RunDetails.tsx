@@ -17,7 +17,7 @@ import { format } from "date-fns";
 import { PageTransition } from "@/components/PageTransition";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 
-const DRAFT_WEBHOOK_URL = "https://453423.xyz/webhook/email-draft-generator";
+const DRAFT_WEBHOOK_URL = "https://primary-production-9f142.up.railway.app/webhook/email-draft-generator";
 
 interface PocRow {
   ranked_poc_id: number;

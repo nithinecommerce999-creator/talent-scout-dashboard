@@ -151,10 +151,9 @@ There are 6 n8n workflows. Here is what each one does and how they connect.
 ---
 
 ### Phase 4 — Email Draft Generator
-**Trigger:** HTTP POST webhook (header-auth secured)  
+**Trigger:** HTTP POST webhook (no authentication)  
 **Webhook path:** `/webhook/email-draft-generator`  
-**Triggered by:** Dashboard "Generate Email Drafts" button on Run Details page  
-**Note:** This is optional — not part of the automatic pipeline. Drafts only, never sends.
+**Production URL:** `https://primary-production-9f142.up.railway.app/webhook/email-draft-generator`
 
 **What it does:**
 1. Receives a `run_id`
@@ -184,7 +183,6 @@ There are 6 n8n workflows. Here is what each one does and how they connect.
 **Requirements:**
 - Gmail OAuth2 credential must be connected in n8n (`Gmail account`)
 - At least one active template in `email_templates` with `is_active = true`
-- Webhook is header-auth secured — the dashboard sends the correct shared secret header automatically
 
 ---
 
