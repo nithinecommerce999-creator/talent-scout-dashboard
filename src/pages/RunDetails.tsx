@@ -66,6 +66,7 @@ export default function RunDetails() {
   const [draftSuccess, setDraftSuccess] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [showDrafts, setShowDrafts] = useState(true);
+  const [draftsEverCreated, setDraftsEverCreated] = useState(false);
 
   async function fetchPocLeads(runId: string) {
     setPocLoading(true);
@@ -161,6 +162,7 @@ export default function RunDetails() {
 
       if (error) throw error;
       setEmailDrafts(data ?? []);
+      if ((data ?? []).length > 0) setDraftsEverCreated(true);
     } catch {
       // silently ignore — drafts section just won't appear
     }
@@ -181,6 +183,7 @@ export default function RunDetails() {
       if (!res.ok) throw new Error(`Webhook returned ${res.status}`);
 
       setDraftSuccess(true);
+      setDraftsEverCreated(true);
       setTimeout(() => {
         if (id) fetchEmailDrafts(id);
       }, 15000);
@@ -726,6 +729,12 @@ export default function RunDetails() {
                         {pocRows.filter(p => p.email_result === 'ok').length > 0 && (
                           <> &middot; {pocRows.filter(p => p.email_result === 'ok' && p.email_quality === 'good').length} verified</>
                         )}
+                        {draftsEverCreated && (
+                          <> &middot; <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                            <CheckCircle className="h-3.5 w-3.5" />
+                            {emailDrafts.filter(d => d.status === 'draft').length} draft{emailDrafts.filter(d => d.status === 'draft').length !== 1 ? 's' : ''} created
+                          </span></>
+                        )}
                       </p>
                     )}
                   </div>
@@ -746,6 +755,11 @@ export default function RunDetails() {
                               </>
                             ) : draftSuccess ? (
                               "Drafts Queued ✓"
+                            ) : draftsEverCreated ? (
+                              <>
+                                <RefreshCw className="h-4 w-4" />
+                                Re-run Email Drafts
+                              </>
                             ) : (
                               <>
                                 <Mail className="h-4 w-4" />
